@@ -1,144 +1,128 @@
 from datetime import datetime
+import hashlib
+import json
 from backend.flask_db.db import db
 
-class Plant(db.Model):
-    __tablename__ = 'plants'
-    id = db.Column(db.Integer, primary_key=True)
+class ULB(db.Model):
+    __tablename__ = 'ulbs'
+    ulb_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    technology_type = db.Column(db.String(50), nullable=False) # Biomethanation, RDF, Composting, Gasification, Recycling, Waste-to-Energy
-    lat = db.Column(db.Float, nullable=False)
-    lng = db.Column(db.Float, nullable=False)
-    max_capacity_tons = db.Column(db.Float, nullable=False)
-    current_utilization_tons = db.Column(db.Float, default=0.0)
-    recovered_heat_mw = db.Column(db.Float, default=0.0)
-    efficiency_factor = db.Column(db.Float, default=1.0) # Used for energy estimation
-    processing_cost_per_ton = db.Column(db.Float, default=100.0)
-    available_heat_mw = db.Column(db.Float, default=0.0)
-    processing_efficiency = db.Column(db.Float, default=0.8)
-    queue_length = db.Column(db.Integer, default=0)
-    
-    historical_generations = db.relationship('HistoricalEnergyGeneration', backref='plant', lazy=True)
-    optimization_results = db.relationship('OptimizationResult', backref='plant', lazy=True)
-    
+    type = db.Column(db.String(50), nullable=False, default='Corporation') # Corporation, Municipality, Town Panchayat
+    district = db.Column(db.String(100), nullable=False, default='Chennai')
+
+    stations = db.relationship('Station', backref='ulb', lazy=True)
+    wards = db.relationship('Ward', backref='ulb', lazy=True)
+    facilities = db.relationship('Facility', backref='ulb', lazy=True)
+    batches = db.relationship('WasteBatch', backref='ulb', lazy=True)
+
     def to_dict(self):
         return {
-            'id': self.id,
+            'ulb_id': self.ulb_id,
             'name': self.name,
-            'technology_type': self.technology_type,
-            'lat': self.lat,
-            'lng': self.lng,
-            'max_capacity_tons': self.max_capacity_tons,
-            'current_utilization_tons': self.current_utilization_tons,
-            'recovered_heat_mw': self.recovered_heat_mw,
-            'efficiency_factor': self.efficiency_factor,
-            'processing_cost_per_ton': self.processing_cost_per_ton,
-            'available_heat_mw': self.available_heat_mw,
-            'processing_efficiency': self.processing_efficiency,
-            'queue_length': self.queue_length
+            'type': self.type,
+            'district': self.district
         }
 
-class Truck(db.Model):
-    __tablename__ = 'trucks'
-    id = db.Column(db.Integer, primary_key=True)
-    registration_number = db.Column(db.String(50), unique=True, nullable=False)
-    capacity_tons = db.Column(db.Float, nullable=False)
-    current_load = db.Column(db.Float, default=0.0)
-    assigned_plant_id = db.Column(db.Integer, db.ForeignKey('plants.id'), nullable=True)
-    route_status = db.Column(db.String(50), default='IDLE')
-    lat = db.Column(db.Float, nullable=True)
-    lng = db.Column(db.Float, nullable=True)
-    
-    batches = db.relationship('WasteBatch', backref='truck', lazy=True)
-    
+class Station(db.Model):
+    __tablename__ = 'stations'
+    station_id = db.Column(db.Integer, primary_key=True)
+    ulb_id = db.Column(db.Integer, db.ForeignKey('ulbs.ulb_id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    location_lat = db.Column(db.Float, nullable=False, default=13.0368)
+    location_lng = db.Column(db.Float, nullable=False, default=80.2676)
+
+    detections = db.relationship('Detection', backref='station', lazy=True)
+    batches = db.relationship('WasteBatch', backref='station', lazy=True)
+
     def to_dict(self):
         return {
-            'id': self.id,
-            'registration_number': self.registration_number,
-            'capacity_tons': self.capacity_tons,
-            'current_load': self.current_load,
-            'assigned_plant_id': self.assigned_plant_id,
-            'route_status': self.route_status,
-            'lat': self.lat,
-            'lng': self.lng
+            'station_id': self.station_id,
+            'ulb_id': self.ulb_id,
+            'ulb_name': self.ulb.name if self.ulb else 'Unknown ULB',
+            'name': self.name,
+            'location_lat': self.location_lat,
+            'location_lng': self.location_lng
         }
 
-class WasteBatch(db.Model):
-    __tablename__ = 'waste_batches'
-    id = db.Column(db.Integer, primary_key=True)
-    truck_id = db.Column(db.Integer, db.ForeignKey('trucks.id'), nullable=False)
-    source_lat = db.Column(db.Float, nullable=False)
-    source_lng = db.Column(db.Float, nullable=False)
-    weight_tons = db.Column(db.Float, nullable=False)
-    organic_percentage = db.Column(db.Float, nullable=False)
-    recyclable_percentage = db.Column(db.Float, nullable=False)
-    hazardous_percentage = db.Column(db.Float, nullable=False)
-    moisture_percentage = db.Column(db.Float, nullable=False)
-    awvs_score = db.Column(db.Float, nullable=True) # Adaptive Waste Value Score
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Upgraded IoT and GIS parameters
-    transfer_station_name = db.Column(db.String(100), nullable=True)
-    zone = db.Column(db.String(100), nullable=True)
-    iot_device_id = db.Column(db.String(50), nullable=True)
-    iot_protocol = db.Column(db.String(50), nullable=True)
-    moisture_raw_v = db.Column(db.Float, default=0.0)
-    load_cell_mv = db.Column(db.Float, default=0.0)
-    fill_level_pct = db.Column(db.Float, default=75.0)
+class Ward(db.Model):
+    __tablename__ = 'wards'
+    ward_id = db.Column(db.Integer, primary_key=True)
+    ulb_id = db.Column(db.Integer, db.ForeignKey('ulbs.ulb_id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    compliance_score = db.Column(db.Float, default=78.5)
 
-    optimization_results = db.relationship('OptimizationResult', backref='waste_batch', lazy=True)
-    
     def to_dict(self):
         return {
-            'id': self.id,
-            'truck_id': self.truck_id,
-            'source_lat': self.source_lat,
-            'source_lng': self.source_lng,
-            'weight_tons': self.weight_tons,
-            'organic_percentage': self.organic_percentage,
-            'recyclable_percentage': self.recyclable_percentage,
-            'hazardous_percentage': self.hazardous_percentage,
-            'moisture_percentage': self.moisture_percentage,
-            'awvs_score': self.awvs_score,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'transfer_station_name': self.transfer_station_name,
-            'zone': self.zone,
-            'iot_device_id': self.iot_device_id,
-            'iot_protocol': self.iot_protocol,
-            'moisture_raw_v': self.moisture_raw_v,
-            'load_cell_mv': self.load_cell_mv,
-            'fill_level_pct': self.fill_level_pct
+            'ward_id': self.ward_id,
+            'ulb_id': self.ulb_id,
+            'ulb_name': self.ulb.name if self.ulb else 'Unknown ULB',
+            'name': self.name,
+            'compliance_score': self.compliance_score
         }
 
-class OptimizationRun(db.Model):
-    __tablename__ = 'optimization_runs'
-    id = db.Column(db.Integer, primary_key=True)
+class Facility(db.Model):
+    __tablename__ = 'facilities'
+    facility_id = db.Column(db.Integer, primary_key=True)
+    ulb_id = db.Column(db.Integer, db.ForeignKey('ulbs.ulb_id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    type = db.Column(db.String(50), nullable=False) # compost, biomethanation, MRF, RDF, Waste-to-Energy
+    current_capacity = db.Column(db.Float, nullable=False, default=100.0) # remaining tons
+    max_capacity = db.Column(db.Float, nullable=False, default=200.0)
+    location_lat = db.Column(db.Float, nullable=False, default=13.04)
+    location_lng = db.Column(db.Float, nullable=False, default=80.22)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+
+    routing_decisions = db.relationship('RoutingDecision', backref='facility', lazy=True)
+
+    def to_dict(self):
+        return {
+            'facility_id': self.facility_id,
+            'ulb_id': self.ulb_id,
+            'ulb_name': self.ulb.name if self.ulb else 'Unknown ULB',
+            'name': self.name,
+            'technology_type': self.type.capitalize() if self.type else 'Composting',
+            'type': self.type,
+            'current_capacity': round(float(self.current_capacity or 0.0), 2),
+            'max_capacity': round(float(self.max_capacity or 0.0), 2),
+            'capacity': round(float(self.max_capacity or 0.0), 2),
+            'utilization': round(float(self.max_capacity - self.current_capacity), 2),
+            'utilization_pct': round(((self.max_capacity - self.current_capacity) / self.max_capacity * 100) if self.max_capacity > 0 else 0, 1),
+            'lat': self.location_lat,
+            'lng': self.location_lng,
+            'location_lat': self.location_lat,
+            'location_lng': self.location_lng,
+            'recovered_heat_mw': 2.4 if 'energy' in (self.type or '').lower() or 'wte' in (self.type or '').lower() else 0.0,
+            'processing_cost_per_ton': 110.0,
+            'queue_length': 1,
+            'last_updated': self.last_updated.strftime('%Y-%m-%d %H:%M:%S') if self.last_updated else None
+        }
+
+# Backwards compatibility alias Plant -> Facility
+Plant = Facility
+
+class Detection(db.Model):
+    __tablename__ = 'detections'
+    detection_id = db.Column(db.Integer, primary_key=True)
+    station_id = db.Column(db.Integer, db.ForeignKey('stations.station_id'), nullable=False)
+    class_name = db.Column(db.String(50), nullable=False) # Wet, Dry, Recyclable
+    confidence = db.Column(db.Float, nullable=False, default=0.95)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    status = db.Column(db.String(50), nullable=False) # e.g., 'SUCCESS', 'FAILED'
-    computation_time_ms = db.Column(db.Float, nullable=True)
-    
-    results = db.relationship('OptimizationResult', backref='run', lazy=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('waste_batches.id'), nullable=True)
+    vehicle_id = db.Column(db.String(50), nullable=True) # Traceability metadata only
 
-class OptimizationResult(db.Model):
-    __tablename__ = 'optimization_results'
-    id = db.Column(db.Integer, primary_key=True)
-    run_id = db.Column(db.Integer, db.ForeignKey('optimization_runs.id'), nullable=False)
-    batch_id = db.Column(db.Integer, db.ForeignKey('waste_batches.id'), nullable=False)
-    assigned_plant_id = db.Column(db.Integer, db.ForeignKey('plants.id'), nullable=False)
-    estimated_energy_kwh = db.Column(db.Float, nullable=False) # Estimated yield for this batch at this plant
-    heat_recovery_utilized = db.Column(db.Boolean, default=False)
-    heat_utilized_mw = db.Column(db.Float, default=0.0)
-    lhv_increase_pct = db.Column(db.Float, default=0.0)
-    recommendation_reason = db.Column(db.Text, nullable=True)
+    def to_dict(self):
+        return {
+            'detection_id': self.detection_id,
+            'station_id': self.station_id,
+            'station_name': self.station.name if self.station else 'Mylapore TS',
+            'class_name': self.class_name,
+            'confidence': round(float(self.confidence or 0.95), 4),
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else None,
+            'batch_id': self.batch_id,
+            'vehicle_id': self.vehicle_id or 'TN-01-AM-1042'
+        }
 
-class HistoricalEnergyGeneration(db.Model):
-    __tablename__ = 'historical_energy_generation'
-    id = db.Column(db.Integer, primary_key=True)
-    plant_id = db.Column(db.Integer, db.ForeignKey('plants.id'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    energy_generated_kwh = db.Column(db.Float, nullable=False)
-    total_waste_processed_tons = db.Column(db.Float, nullable=False)
-
-
+# Backwards compatibility alias ConveyorItem -> Detection
 class ConveyorItem(db.Model):
     __tablename__ = 'conveyor_items'
     id = db.Column(db.Integer, primary_key=True)
@@ -146,7 +130,7 @@ class ConveyorItem(db.Model):
     class_id = db.Column(db.Integer, nullable=False) # 0=wet, 1=dry, 2=recyclable
     class_name = db.Column(db.String(50), nullable=False) # wet, dry, recyclable
     confidence = db.Column(db.Float, nullable=False, default=0.95)
-    sorting_decision = db.Column(db.String(50), nullable=False) # WET BIN, DRY BIN, RECYCLABLE BIN
+    sorting_decision = db.Column(db.String(50), nullable=False)
     item_weight_kg = db.Column(db.Float, default=0.25)
     camera_id = db.Column(db.String(50), default='CONVEYOR_CAM_01')
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
@@ -164,57 +148,194 @@ class ConveyorItem(db.Model):
             'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else None
         }
 
-
-class RoutingAuditLog(db.Model):
-    __tablename__ = 'routing_audit_logs'
+class WasteBatch(db.Model):
+    __tablename__ = 'waste_batches'
     id = db.Column(db.Integer, primary_key=True)
-    batch_id = db.Column(db.Integer, nullable=False)
-    source_ulb = db.Column(db.String(100), nullable=False) # e.g., GCC Zone 9 Teynampet
-    matched_facility = db.Column(db.String(100), nullable=False) # Facility Name or "Landfill — No Match"
-    escalation_status = db.Column(db.String(50), nullable=False) # MATCHED, ESCALATED, FALLBACK
-    distance_km = db.Column(db.Float, default=0.0)
-    cost_factor_inr = db.Column(db.Float, default=0.0)
-    carbon_offset_kg = db.Column(db.Float, default=0.0)
-    reason = db.Column(db.Text, nullable=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    station_id = db.Column(db.Integer, db.ForeignKey('stations.station_id'), nullable=True)
+    ulb_id = db.Column(db.Integer, db.ForeignKey('ulbs.ulb_id'), nullable=True)
+    truck_id = db.Column(db.Integer, nullable=True) # Traceability metadata
+    source_lat = db.Column(db.Float, nullable=False, default=13.04)
+    source_lng = db.Column(db.Float, nullable=False, default=80.22)
+    weight_tons = db.Column(db.Float, nullable=False, default=10.0)
+    organic_percentage = db.Column(db.Float, nullable=False, default=60.0)
+    recyclable_percentage = db.Column(db.Float, nullable=False, default=30.0)
+    hazardous_percentage = db.Column(db.Float, nullable=False, default=10.0)
+    moisture_percentage = db.Column(db.Float, nullable=False, default=45.0)
+    awvs_score = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp_window = db.Column(db.String(100), nullable=True)
+    
+    # Telemetry Columns
+    transfer_station_name = db.Column(db.String(100), nullable=True)
+    zone = db.Column(db.String(100), nullable=True)
+    iot_device_id = db.Column(db.String(50), nullable=True)
+
+    routing_decisions = db.relationship('RoutingDecision', backref='batch', lazy=True)
+    mrv_records = db.relationship('MRVRecord', backref='batch', lazy=True)
 
     def to_dict(self):
         return {
             'id': self.id,
+            'batch_id': self.id,
+            'station_id': self.station_id,
+            'ulb_id': self.ulb_id,
+            'ulb_name': self.ulb.name if self.ulb else (self.transfer_station_name or 'GCC Zone 9 Teynampet'),
+            'weight_tons': round(float(self.weight_tons or 0.0), 2),
+            'organic_percentage': round(float(self.organic_percentage or 0.0), 1),
+            'recyclable_percentage': round(float(self.recyclable_percentage or 0.0), 1),
+            'hazardous_percentage': round(float(self.hazardous_percentage or 0.0), 1),
+            'moisture_percentage': round(float(self.moisture_percentage or 0.0), 1),
+            'awvs_score': round(float(self.awvs_score or 0.0), 2) if self.awvs_score is not None else None,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'timestamp_window': self.timestamp_window or (self.created_at.strftime('%Y-%m-%d 08:00-12:00') if self.created_at else '2026-08-30 08:00-12:00'),
+            'transfer_station_name': self.transfer_station_name or 'Mylapore TS',
+            'source_lat': self.source_lat,
+            'source_lng': self.source_lng
+        }
+
+class Truck(db.Model):
+    __tablename__ = 'trucks'
+    id = db.Column(db.Integer, primary_key=True)
+    registration_number = db.Column(db.String(50), unique=True, nullable=False)
+    capacity_tons = db.Column(db.Float, nullable=False)
+    current_load = db.Column(db.Float, default=0.0)
+    assigned_plant_id = db.Column(db.Integer, nullable=True)
+    route_status = db.Column(db.String(50), default='IDLE')
+    lat = db.Column(db.Float, nullable=True)
+    lng = db.Column(db.Float, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'registration_number': self.registration_number,
+            'capacity_tons': self.capacity_tons,
+            'current_load': self.current_load,
+            'assigned_plant_id': self.assigned_plant_id,
+            'route_status': self.route_status,
+            'lat': self.lat,
+            'lng': self.lng
+        }
+
+class RoutingDecision(db.Model):
+    __tablename__ = 'routing_decisions'
+    decision_id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('waste_batches.id'), nullable=False)
+    matched_facility_id = db.Column(db.Integer, db.ForeignKey('facilities.facility_id'), nullable=True) # Null = Landfill Fallback
+    match_type = db.Column(db.String(50), nullable=False) # local, cross-ULB, landfill
+    distance_or_cost_factor = db.Column(db.Float, default=0.0)
+    reason = db.Column(db.Text, nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    mrv_records = db.relationship('MRVRecord', backref='routing_decision', lazy=True)
+
+    def to_dict(self):
+        fac_name = self.facility.name if self.facility else "Landfill Fallback"
+        return {
+            'decision_id': self.decision_id,
+            'id': self.decision_id,
             'batch_id': self.batch_id,
-            'source_ulb': self.source_ulb,
-            'matched_facility': self.matched_facility,
-            'escalation_status': self.escalation_status,
-            'distance_km': round(float(self.distance_km or 0.0), 2),
-            'cost_factor_inr': round(float(self.cost_factor_inr or 0.0), 2),
-            'carbon_offset_kg': round(float(self.carbon_offset_kg or 0.0), 2),
+            'matched_facility_id': self.matched_facility_id,
+            'matched_facility': fac_name,
+            'source_ulb': self.batch.ulb.name if (self.batch and self.batch.ulb) else "GCC Zone 9 (Teynampet)",
+            'match_type': self.match_type,
+            'escalation_status': 'MATCHED' if self.match_type == 'local' else ('ESCALATED' if self.match_type == 'cross-ULB' else 'FALLBACK'),
+            'distance_or_cost_factor': round(float(self.distance_or_cost_factor or 0.0), 2),
+            'distance_km': round(float(self.distance_or_cost_factor or 0.0), 1),
+            'cost_factor_inr': round(float((self.distance_or_cost_factor or 5.0) * 110.0), 2),
             'reason': self.reason,
             'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else None
         }
 
-class ULBDiversionStat(db.Model):
-    __tablename__ = 'ulb_diversion_stats'
+class DiversionMetric(db.Model):
+    __tablename__ = 'diversion_metrics'
     id = db.Column(db.Integer, primary_key=True)
-    ulb_name = db.Column(db.String(100), nullable=False)
-    district = db.Column(db.String(100), nullable=False, default='Chennai District')
-    total_generated_tons = db.Column(db.Float, nullable=False, default=0.0)
-    recovered_tons = db.Column(db.Float, nullable=False, default=0.0)
-    landfilled_tons = db.Column(db.Float, nullable=False, default=0.0)
-    diversion_rate_pct = db.Column(db.Float, nullable=False, default=0.0)
-    baseline_diversion_pct = db.Column(db.Float, nullable=False, default=32.5) # Pre-system baseline
-    segregation_compliance_pct = db.Column(db.Float, nullable=False, default=70.0)
-    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+    ulb_id = db.Column(db.Integer, db.ForeignKey('ulbs.ulb_id'), nullable=False)
+    district = db.Column(db.String(100), nullable=False, default='Chennai')
+    period = db.Column(db.String(50), nullable=False, default='Current Month')
+    diversion_rate = db.Column(db.Float, nullable=False, default=0.0) # Percentage 0-100
+    total_diverted_weight = db.Column(db.Float, nullable=False, default=0.0)
+    total_landfill_weight = db.Column(db.Float, nullable=False, default=0.0)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        total_gen = self.total_diverted_weight + self.total_landfill_weight
+        return {
+            'id': self.id,
+            'ulb_id': self.ulb_id,
+            'ulb_name': self.ulb.name if self.ulb else 'Unknown ULB',
+            'district': self.district,
+            'period': self.period,
+            'diversion_rate': round(float(self.diversion_rate or 0.0), 1),
+            'diversion_rate_pct': round(float(self.diversion_rate or 0.0), 1),
+            'total_diverted_weight': round(float(self.total_diverted_weight or 0.0), 2),
+            'total_landfill_weight': round(float(self.total_landfill_weight or 0.0), 2),
+            'total_generated_weight': round(total_gen, 2),
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else None
+        }
+
+# Backwards compatibility alias ULBDiversionStat
+ULBDiversionStat = DiversionMetric
+
+class MRVRecord(db.Model):
+    __tablename__ = 'mrv_records'
+    record_id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('waste_batches.id'), nullable=False)
+    routing_decision_id = db.Column(db.Integer, db.ForeignKey('routing_decisions.decision_id'), nullable=False)
+    estimated_co2e_avoided = db.Column(db.Float, nullable=False, default=0.0) # Tons CO2e
+    calculation_method = db.Column(db.String(150), nullable=False, default='IPCC 2019 Methane Avoidance Factor vs Landfill Baseline')
+    ledger_hash_reference = db.Column(db.String(100), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'ulb_name': self.ulb_name,
-            'district': self.district,
-            'total_generated_tons': round(float(self.total_generated_tons or 0.0), 2),
-            'recovered_tons': round(float(self.recovered_tons or 0.0), 2),
-            'landfilled_tons': round(float(self.landfilled_tons or 0.0), 2),
-            'diversion_rate_pct': round(float(self.diversion_rate_pct or 0.0), 2),
-            'baseline_diversion_pct': round(float(self.baseline_diversion_pct or 32.5), 2),
-            'segregation_compliance_pct': round(float(self.segregation_compliance_pct or 70.0), 2),
-            'last_updated': self.last_updated.strftime('%Y-%m-%d %H:%M:%S') if self.last_updated else None
+            'record_id': self.record_id,
+            'batch_id': self.batch_id,
+            'routing_decision_id': self.routing_decision_id,
+            'estimated_co2e_avoided': round(float(self.estimated_co2e_avoided or 0.0), 3),
+            'calculation_method': self.calculation_method,
+            'ledger_hash_reference': self.ledger_hash_reference,
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else None
         }
+
+class LedgerEntry(db.Model):
+    __tablename__ = 'ledger_entries'
+    entry_id = db.Column(db.Integer, primary_key=True)
+    entry_type = db.Column(db.String(50), nullable=False) # DETECTION, BATCH, ROUTING, MRV_RECORD
+    payload_hash = db.Column(db.String(64), nullable=False)
+    previous_hash = db.Column(db.String(64), nullable=False)
+    current_hash = db.Column(db.String(64), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    metadata_info = db.Column(db.Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            'entry_id': self.entry_id,
+            'entry_type': self.entry_type,
+            'payload_hash': self.payload_hash,
+            'previous_hash': self.previous_hash,
+            'current_hash': self.current_hash,
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else None,
+            'metadata_info': self.metadata_info
+        }
+
+    @staticmethod
+    def create_entry(entry_type, payload_dict, metadata_info=''):
+        last_entry = LedgerEntry.query.order_by(LedgerEntry.entry_id.desc()).first()
+        prev_hash = last_entry.current_hash if last_entry else "0000000000000000000000000000000000000000000000000000000000000000"
+        
+        payload_str = json.dumps(payload_dict, sort_keys=True)
+        payload_hash = hashlib.sha256(payload_str.encode('utf-8')).hexdigest()
+        
+        combined_str = f"{prev_hash}{payload_hash}{datetime.utcnow().isoformat()}"
+        current_hash = hashlib.sha256(combined_str.encode('utf-8')).hexdigest()
+        
+        entry = LedgerEntry(
+            entry_type=entry_type,
+            payload_hash=payload_hash,
+            previous_hash=prev_hash,
+            current_hash=current_hash,
+            metadata_info=metadata_info
+        )
+        db.session.add(entry)
+        db.session.commit()
+        return entry

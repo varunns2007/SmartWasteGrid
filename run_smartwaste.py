@@ -5,39 +5,27 @@ import subprocess
 import requests
 
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
-API_URL = "http://127.0.0.1:8000"
 DASHBOARD_URL = "http://127.0.0.1:5000"
 
 def main():
     print("============================================================", flush=True)
-    print("      UNIFIED SMARTWASTE & QUANTUM LOGISTICS PLATFORM       ", flush=True)
+    print("      SMARTWASTEGRID WASTE INTELLIGENCE PLATFORM            ", flush=True)
     print("============================================================", flush=True)
     
-    # 1. Start FastAPI Backend Server if not active
-    try:
-        r = requests.get(f"{API_URL}/health", timeout=2)
-        if r.status_code == 200:
-            print(f"[OK] FastAPI Backend active at {API_URL}", flush=True)
-    except Exception:
-        print("[STARTING] Launching FastAPI Backend on http://127.0.0.1:8000...", flush=True)
-        py_exe = sys.executable
-        subprocess.Popen([py_exe, "-m", "uvicorn", "backend.app:app", "--host", "127.0.0.1", "--port", "8000"])
-        time.sleep(2)
-
-    # 2. Start Quantum Waste Optimization Flask Dashboard if not active
+    # Start SmartWasteGrid Dashboard if not active
     try:
         r = requests.get(f"{DASHBOARD_URL}/", timeout=2)
         if r.status_code == 200:
-            print(f"[OK] Quantum Waste Dashboard active at {DASHBOARD_URL}", flush=True)
+            print(f"[OK] SmartWasteGrid Dashboard active at {DASHBOARD_URL}", flush=True)
     except Exception:
-        print("[STARTING] Launching Quantum Waste Dashboard on http://127.0.0.1:5000...", flush=True)
+        print("[STARTING] Launching SmartWasteGrid Dashboard on http://127.0.0.1:5000...", flush=True)
         py_exe = sys.executable
-        q_app = os.path.join(PROJECT_ROOT, "backend", "quantum_app.py")
-        if os.path.exists(q_app):
-            subprocess.Popen([py_exe, q_app], cwd=os.path.join(PROJECT_ROOT, "backend"))
+        app_file = os.path.join(PROJECT_ROOT, "backend", "app.py")
+        if os.path.exists(app_file):
+            subprocess.Popen([py_exe, app_file], cwd=PROJECT_ROOT)
             time.sleep(2)
 
-    # 3. Launch Live Conveyor Segregation Tracking Feed
+    # Launch Live Conveyor Segregation Tracking Feed
     print("\n[STARTING] Launching Live Conveyor Segregation Inference Feed...", flush=True)
     conveyor_script = os.path.join(PROJECT_ROOT, "tools", "conveyor_inference.py")
     

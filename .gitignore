@@ -10,3 +10,5 @@ reports/
 *.zip
 *.db
 *.sqlite3
+scratch/
+*.log

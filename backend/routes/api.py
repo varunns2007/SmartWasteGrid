@@ -1,5 +1,6 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 from backend.services.waste_service import WasteService
+from backend.services.mrv_service import MRVService
 
 api_bp = Blueprint('api', __name__)
 
@@ -9,7 +10,7 @@ def get_plants():
 
 @api_bp.route('/plants', methods=['POST'])
 def add_plant():
-    data = request.json
+    data = request.json or {}
     plant = WasteService.add_plant(
         name=data.get('name'),
         technology_type=data.get('technology_type'),
@@ -34,8 +35,7 @@ def get_unallocated():
 def run_workflow():
     data = request.json or {}
     num_batches = data.get('num_batches', 3)
-    solver_mode = data.get('solver_mode', 'cnn_milp')
-    result = WasteService.run_simulation_and_optimization_workflow(num_batches=num_batches, solver_mode=solver_mode)
+    result = WasteService.run_simulation_and_optimization_workflow(num_batches=num_batches)
     return jsonify(result)
 
 @api_bp.route('/dashboard/summary', methods=['GET'])
@@ -53,7 +53,6 @@ def get_transit_telemetry():
     station_name = request.args.get('station_name')
     result = WasteService.get_transit_center_telemetry(station_name)
     return jsonify(result)
-
 
 @api_bp.route('/camera/mode', methods=['GET', 'POST'])
 def camera_mode():
@@ -73,7 +72,6 @@ def camera_mode():
         return jsonify({'status': 'SUCCESS', 'simulation_mode': sim_enabled, 'mode': 'simulation' if sim_enabled else 'hardware', 'camera_index': cam.camera_index})
     return jsonify({'simulation_mode': cam.force_simulation, 'mode': 'simulation' if cam.force_simulation else 'hardware', 'camera_index': cam.camera_index})
 
-
 @api_bp.route('/conveyor/simulate', methods=['POST'])
 def simulate_conveyor_detection():
     data = request.json or {}
@@ -88,7 +86,6 @@ def get_live_conveyor():
     limit = request.args.get('limit', 20, type=int)
     items = WasteService.get_live_conveyor_items(limit=limit)
     return jsonify(items)
-
 
 @api_bp.route('/conveyor/tick', methods=['GET'])
 def get_conveyor_tick():
@@ -128,7 +125,6 @@ def get_conveyor_statistics():
     stats = WasteService.get_conveyor_stats()
     return jsonify(stats)
 
-
 @api_bp.route('/database/detections', methods=['GET'])
 def get_db_detections():
     page = request.args.get('page', 1, type=int)
@@ -165,3 +161,17 @@ def get_cross_ulb_matching_panel():
 def get_diversion_metrics_panel():
     res = WasteService.get_diversion_metrics_data()
     return jsonify(res)
+
+@api_bp.route('/mrv/summary', methods=['GET'])
+def get_mrv_summary():
+    res = MRVService.get_carbon_impact_summary()
+    return jsonify(res)
+
+@api_bp.route('/mrv/export', methods=['GET'])
+def export_mrv_report():
+    csv_data = MRVService.generate_auditor_csv_report()
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=MRV_Auditor_Report_Cryptographic_Ledger.csv"}
+    )
