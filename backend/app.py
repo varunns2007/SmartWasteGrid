@@ -1,7 +1,8 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, Response
 from backend.flask_db.db import db
 from backend.routes.api import api_bp
+from backend.camera_stream import gen_frames, start_camera_auto_logger
 
 def create_app(test_config=None):
     app = Flask(__name__, 
@@ -21,12 +22,21 @@ def create_app(test_config=None):
     def index():
         return render_template('index.html')
 
+    @app.route('/video_feed')
+    def video_feed():
+        return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
     @app.route('/favicon.ico')
     def favicon():
         return "", 204
 
     with app.app_context():
         db.create_all()
+
+    try:
+        start_camera_auto_logger(app)
+    except Exception:
+        pass
 
     return app
 
