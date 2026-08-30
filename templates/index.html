@@ -69,6 +69,52 @@
             background: #27272a;
             border-radius: 4px;
         }
+        /* Custom Leaflet Dark Popups & Animated Map Markers */
+        .leaflet-popup-content-wrapper {
+            background: #09090b !important;
+            color: #f4f4f5 !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+            padding: 0 !important;
+        }
+        .leaflet-popup-content {
+            margin: 0 !important;
+            line-height: 1.4 !important;
+        }
+        .leaflet-popup-tip {
+            background: #09090b !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+        .leaflet-container {
+            background: #09090b !important;
+            font-family: 'Outfit', sans-serif !important;
+        }
+        .marker-pulse {
+            position: relative;
+        }
+        .marker-pulse::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            border-radius: 50%;
+            animation: mapPulse 2s infinite;
+        }
+        @keyframes mapPulse {
+            0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1.6); opacity: 0; box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { transform: scale(1); opacity: 0; }
+        }
+        .route-flow-line {
+            stroke-dasharray: 8, 8;
+            animation: routeDash 30s linear infinite;
+        }
+        @keyframes routeDash {
+            to { stroke-dashoffset: -1000; }
+        }
     </style>
 </head>
 <body class="bg-darkBg text-zinc-100 min-h-screen">
@@ -222,6 +268,36 @@
                 };
             }, [transitLiveMode, activeTab, activeTransitStation]);
 
+            const [mapStyle, setMapStyle] = useState('cartoDark');
+            const [mapFilter, setMapFilter] = useState('all');
+            const tileLayerRef = useRef(null);
+            const routesLayerGroup = useRef(null);
+
+            const switchMapStyle = (styleKey) => {
+                setMapStyle(styleKey);
+                if (!mapInstance.current) return;
+                if (tileLayerRef.current) {
+                    mapInstance.current.removeLayer(tileLayerRef.current);
+                }
+                
+                let url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+                let attrib = '&copy; OpenStreetMap &copy; CARTO (Free No-API-Key Dark Tiles)';
+                
+                if (styleKey === 'esriSatellite') {
+                    url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+                    attrib = 'Tiles &copy; Esri (Free Open Satellite)';
+                } else if (styleKey === 'osmStandard') {
+                    url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+                    attrib = '&copy; OpenStreetMap contributors (Free Standard Tiles)';
+                }
+                
+                tileLayerRef.current = L.tileLayer(url, {
+                    attribution: attrib,
+                    maxZoom: 19,
+                    subdomains: 'abcd'
+                }).addTo(mapInstance.current);
+            };
+
             useEffect(() => {
                 if (mapContainerRef.current && !mapInstance.current && !loading) {
                     mapInstance.current = L.map(mapContainerRef.current, {
@@ -230,38 +306,189 @@
                         zoomControl: true
                     });
 
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    tileLayerRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                         attribution: '&copy; OpenStreetMap &copy; CARTO',
                         subdomains: 'abcd',
                         maxZoom: 19
                     }).addTo(mapInstance.current);
 
+                    routesLayerGroup.current = L.layerGroup().addTo(mapInstance.current);
                     mapMarkersGroup.current = L.layerGroup().addTo(mapInstance.current);
                     animatedTrucksGroup.current = L.layerGroup().addTo(mapInstance.current);
                 }
             }, [loading]);
 
+            const fitMapBounds = () => {
+                if (!mapInstance.current || !summary) return;
+                const bounds = L.latLngBounds([]);
+                if (summary.plants) summary.plants.forEach(p => bounds.extend([p.lat, p.lng]));
+                if (summary.trucks) summary.trucks.forEach(t => bounds.extend([t.lat, t.lng]));
+                bounds.extend([13.0368, 80.2676]);
+                bounds.extend([13.0418, 80.2341]);
+                bounds.extend([12.9985, 80.2565]);
+                bounds.extend([13.0878, 80.1994]);
+                if (bounds.isValid()) {
+                    mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
+                }
+            };
+
+            const focusLiveEdge = () => {
+                if (mapInstance.current) {
+                    mapInstance.current.flyTo([13.0368, 80.2676], 14, { duration: 1.5 });
+                }
+            };
+
             useEffect(() => {
                 if (mapInstance.current && mapMarkersGroup.current && summary) {
                     mapInstance.current.invalidateSize();
                     mapMarkersGroup.current.clearLayers();
+                    if (routesLayerGroup.current) routesLayerGroup.current.clearLayers();
 
-                    summary.plants.forEach(plant => {
-                        const plantIcon = L.divIcon({
-                            html: `<div class="w-8 h-8 rounded-full bg-blue-600 border-2 border-slate-900 flex items-center justify-center shadow-lg shadow-blue-500/40">
-                                     <span class="text-[10px] font-bold text-white">P</span>
-                                   </div>`,
-                            className: 'custom-leaflet-icon',
-                            iconSize: [32, 32],
-                            iconAnchor: [16, 16]
+                    const transferStations = [
+                        { name: "Mylapore Transfer Station", lat: 13.0368, lng: 80.2676, weight: "12.4 Tons", org: "58%", rec: "28%" },
+                        { name: "T. Nagar Collection Hub", lat: 13.0418, lng: 80.2341, weight: "9.8 Tons", org: "62%", rec: "22%" },
+                        { name: "Adyar Transfer Hub", lat: 12.9985, lng: 80.2565, weight: "14.2 Tons", org: "48%", rec: "36%" },
+                        { name: "Anna Nagar West Station", lat: 13.0878, lng: 80.1994, weight: "11.5 Tons", org: "52%", rec: "31%" },
+                        { name: "Velachery Station Queue", lat: 12.9750, lng: 80.2210, weight: "8.6 Tons", org: "60%", rec: "24%" },
+                        { name: "Tambaram Central Queue", lat: 12.9249, 80.1000, weight: "15.0 Tons", org: "44%", rec: "40%" }
+                    ];
+
+                    // Render Plants
+                    if (mapFilter === 'all' || mapFilter === 'wte' || mapFilter === 'compost' || mapFilter === 'recycling') {
+                        summary.plants.forEach(plant => {
+                            const isWte = plant.technology_type.includes('Energy') || plant.technology_type.includes('Gasification') || plant.technology_type.includes('RDF');
+                            const isCompost = plant.technology_type.includes('Composting') || plant.technology_type.includes('Biomethanation');
+                            const isRecycle = plant.technology_type.includes('Recycling');
+
+                            if (mapFilter === 'wte' && !isWte) return;
+                            if (mapFilter === 'compost' && !isCompost) return;
+                            if (mapFilter === 'recycling' && !isRecycle) return;
+
+                            let colorBg = 'bg-amber-500 shadow-amber-500/50';
+                            let badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+                            let iconLetter = '⚡';
+
+                            if (isCompost) {
+                                colorBg = 'bg-emerald-500 shadow-emerald-500/50';
+                                badgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+                                iconLetter = '🌱';
+                            } else if (isRecycle) {
+                                colorBg = 'bg-sky-500 shadow-sky-500/50';
+                                badgeColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+                                iconLetter = '♻️';
+                            }
+
+                            const plantIcon = L.divIcon({
+                                html: `<div class="marker-pulse w-9 h-9 rounded-full ${colorBg} border-2 border-zinc-950 flex items-center justify-center shadow-xl cursor-pointer hover:scale-110 transition-transform">
+                                         <span class="text-xs font-bold text-white">${iconLetter}</span>
+                                       </div>`,
+                                className: 'custom-leaflet-icon',
+                                iconSize: [36, 36],
+                                iconAnchor: [18, 18]
+                            });
+
+                            const popupHtml = `
+                                <div class="p-3.5 font-sans min-w-[250px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
+                                    <div class="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
+                                        <span class="text-xs font-bold text-white uppercase">${plant.name}</span>
+                                        <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${badgeColor}">${plant.technology_type}</span>
+                                    </div>
+                                    <div class="space-y-1.5 text-[11px] text-zinc-300">
+                                        <div class="flex justify-between"><span>Max Capacity:</span> <strong class="text-white">${plant.capacity} Tons/day</strong></div>
+                                        <div class="flex justify-between"><span>Current Load:</span> <strong class="text-amber-400">${plant.utilization} Tons (${plant.utilization_pct}%)</strong></div>
+                                        <div class="w-full bg-zinc-900 h-2 rounded-full overflow-hidden my-1 border border-zinc-800">
+                                            <div class="bg-gradient-to-r from-emerald-500 to-amber-400 h-full" style="width: ${plant.utilization_pct}%"></div>
+                                        </div>
+                                        <div class="flex justify-between"><span>Heat Recovered:</span> <strong class="text-purple-300">${plant.recovered_heat_mw} MW</strong></div>
+                                        <div class="flex justify-between"><span>Processing Cost:</span> <strong class="text-emerald-300">₹${plant.processing_cost_per_ton}/Ton</strong></div>
+                                        <div class="flex justify-between"><span>Queue Length:</span> <strong class="text-sky-300">${plant.queue_length} Trucks Waiting</strong></div>
+                                    </div>
+                                </div>
+                            `;
+
+                            L.marker([plant.lat, plant.lng], { icon: plantIcon })
+                                .bindPopup(popupHtml)
+                                .addTo(mapMarkersGroup.current);
                         });
+                    }
 
-                        L.marker([plant.lat, plant.lng], { icon: plantIcon })
-                            .bindPopup(`<b>${plant.name}</b><br/>Type: ${plant.technology_type}`)
-                            .addTo(mapMarkersGroup.current);
-                    });
+                    // Render Transfer Stations
+                    if (mapFilter === 'all' || mapFilter === 'transfer') {
+                        transferStations.forEach(st => {
+                            const stIcon = L.divIcon({
+                                html: `<div class="w-8 h-8 rounded-xl bg-purple-600 border-2 border-zinc-950 flex items-center justify-center shadow-lg shadow-purple-500/40 cursor-pointer hover:scale-110 transition-transform">
+                                         <span class="text-xs font-bold text-white">📦</span>
+                                       </div>`,
+                                className: 'custom-leaflet-icon',
+                                iconSize: [32, 32],
+                                iconAnchor: [16, 16]
+                            });
+
+                            const popupHtml = `
+                                <div class="p-3 font-sans min-w-[230px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
+                                    <div class="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
+                                        <span class="text-xs font-bold text-purple-300 uppercase">${st.name}</span>
+                                        <span class="text-[9px] font-bold px-2 py-0.5 rounded border bg-purple-500/20 text-purple-300 border-purple-500/40">TRANSFER HUB</span>
+                                    </div>
+                                    <div class="space-y-1 text-[11px] text-zinc-300">
+                                        <div class="flex justify-between"><span>Queued Payload:</span> <strong class="text-white">${st.weight}</strong></div>
+                                        <div class="flex justify-between"><span>Organic Share:</span> <strong class="text-emerald-400">${st.org}</strong></div>
+                                        <div class="flex justify-between"><span>Recyclable Share:</span> <strong class="text-sky-400">${st.rec}</strong></div>
+                                    </div>
+                                </div>
+                            `;
+
+                            L.marker([st.lat, st.lng], { icon: stIcon })
+                                .bindPopup(popupHtml)
+                                .addTo(mapMarkersGroup.current);
+                        });
+                    }
+
+                    // Render Active Fleet Trucks
+                    if ((mapFilter === 'all' || mapFilter === 'fleet') && summary.trucks) {
+                        summary.trucks.forEach((truck, idx) => {
+                            const truckIcon = L.divIcon({
+                                html: `<div class="w-8 h-8 rounded-full bg-zinc-900 border-2 border-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/30 cursor-pointer hover:scale-110 transition-transform">
+                                         <span class="text-xs">🚛</span>
+                                       </div>`,
+                                className: 'custom-leaflet-icon',
+                                iconSize: [32, 32],
+                                iconAnchor: [16, 16]
+                            });
+
+                            const popupHtml = `
+                                <div class="p-3 font-sans min-w-[230px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
+                                    <div class="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
+                                        <span class="text-xs font-mono font-bold text-emerald-400">${truck.registration_number}</span>
+                                        <span class="text-[9px] font-bold px-2 py-0.5 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">${truck.route_status}</span>
+                                    </div>
+                                    <div class="space-y-1 text-[11px] text-zinc-300">
+                                        <div class="flex justify-between"><span>Capacity:</span> <strong class="text-white">${truck.capacity_tons} Tons</strong></div>
+                                        <div class="flex justify-between"><span>Telemetry Lat/Lng:</span> <strong class="text-zinc-400">${truck.lat.toFixed(3)}, ${truck.lng.toFixed(3)}</strong></div>
+                                    </div>
+                                </div>
+                            `;
+
+                            L.marker([truck.lat, truck.lng], { icon: truckIcon })
+                                .bindPopup(popupHtml)
+                                .addTo(mapMarkersGroup.current);
+
+                            // Connect Truck to nearest plant with glowing animated route polyline
+                            if (summary.plants && summary.plants[idx % summary.plants.length]) {
+                                const targetPlant = summary.plants[idx % summary.plants.length];
+                                const polyline = L.polyline([[truck.lat, truck.lng], [targetPlant.lat, targetPlant.lng]], {
+                                    color: '#10b981',
+                                    weight: 2,
+                                    opacity: 0.6,
+                                    className: 'route-flow-line'
+                                });
+                                polyline.bindTooltip(`Route Vector: ${truck.registration_number} → ${targetPlant.name}`, { sticky: true });
+                                polyline.addTo(routesLayerGroup.current);
+                            }
+                        });
+                    }
                 }
-            }, [summary]);
+            }, [summary, mapFilter]);
 
             const [cameraMode, setCameraMode] = useState('hardware');
             const [cameraIdx, setCameraIdx] = useState(1);
@@ -620,12 +847,63 @@
                     </div>
 
                     {/* Leaflet GIS Map Container */}
-                    <div className="info-panel p-5 rounded-2xl bg-[#09090b] border border-zinc-800 space-y-3">
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                            <Icon name="map-pin" className="w-4 h-4 text-sky-400" />
-                            Smart City GIS Digital Twin Map (Chennai Case Study)
-                        </h2>
-                        <div ref={mapContainerRef} className="flex-1 rounded-xl border border-zinc-800 overflow-hidden" style={{ height: '370px', width: '100%' }}></div>
+                    <div className="info-panel p-5 rounded-2xl bg-[#09090b] border border-zinc-800 space-y-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                            <div>
+                                <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                                    <Icon name="map-pin" className="w-4 h-4 text-sky-400" />
+                                    Smart City GIS Digital Twin Map (Chennai ULB Case Study)
+                                </h2>
+                                <p className="text-[11px] text-zinc-400 mt-0.5">100% Open Access Maps (Zero API Keys) &bull; Live Fleet & Treatment Facility Telemetry</p>
+                            </div>
+                            
+                            {/* Layer & Control Action Buttons */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {/* Map Style Selector */}
+                                <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-[11px]">
+                                    <button onClick={() => switchMapStyle('cartoDark')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'cartoDark' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                                        🌙 Dark
+                                    </button>
+                                    <button onClick={() => switchMapStyle('esriSatellite')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'esriSatellite' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                                        🛰️ Satellite
+                                    </button>
+                                    <button onClick={() => switchMapStyle('osmStandard')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'osmStandard' ? 'bg-sky-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                                        🗺️ Street
+                                    </button>
+                                </div>
+                                
+                                <button onClick={fitMapBounds} className="bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-zinc-800 transition">
+                                    Fit All Markers
+                                </button>
+                                <button onClick={focusLiveEdge} className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-purple-500/40 transition">
+                                    Focus Live Edge
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Interactive Category Filter Pills */}
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[11px] font-bold">
+                            <button onClick={() => setMapFilter('all')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'all' ? 'bg-white text-zinc-950 border-white shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                                All Locations
+                            </button>
+                            <button onClick={() => setMapFilter('wte')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'wte' ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                                ⚡ WtE & Gasification
+                            </button>
+                            <button onClick={() => setMapFilter('compost')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'compost' ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                                🌱 Composting & Bio-CNG
+                            </button>
+                            <button onClick={() => setMapFilter('recycling')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'recycling' ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                                ♻️ Recycling Plants
+                            </button>
+                            <button onClick={() => setMapFilter('transfer')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'transfer' ? 'bg-purple-500 text-white border-purple-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                                📦 Transfer Hubs
+                            </button>
+                            <button onClick={() => setMapFilter('fleet')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'fleet' ? 'bg-emerald-600 text-white border-emerald-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                                🚛 Active Fleet
+                            </button>
+                        </div>
+
+                        <div ref={mapContainerRef} className="flex-1 rounded-xl border border-zinc-800 overflow-hidden shadow-2xl" style={{ height: '420px', width: '100%' }}></div>
                     </div>
                 </div>
             );
