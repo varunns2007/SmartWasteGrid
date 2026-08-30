@@ -24,14 +24,17 @@
             theme: {
                 extend: {
                     colors: {
-                        darkBg: '#09090b',
-                        cardBg: '#121215',
-                        glassBorder: 'rgba(255, 255, 255, 0.08)',
-                        accentPurple: '#8b5cf6',
-                        accentBlue: '#3b82f6',
-                        accentGreen: '#10b981',
-                        accentAmber: '#f59e0b',
-                        accentRose: '#f43f5e'
+                        darkBg: '#0d0f12',
+                        cardBg: '#14181d',
+                        glassBorder: 'rgba(157, 190, 183, 0.18)',
+                        paletteCream: '#efe6d5',
+                        paletteTeal: '#9dbeb7',
+                        paletteRed: '#e73213',
+                        accentPurple: '#9dbeb7',
+                        accentBlue: '#9dbeb7',
+                        accentGreen: '#efe6d5',
+                        accentAmber: '#e73213',
+                        accentRose: '#e73213'
                     },
                     fontFamily: {
                         sans: ['Outfit', 'sans-serif']
@@ -42,14 +45,14 @@
     </script>
     <style>
         body {
-            background-color: #09090b;
-            color: #f4f4f5;
+            background-color: #0d0f12;
+            color: #efe6d5;
             font-family: 'Outfit', sans-serif;
         }
         .info-panel {
-            background: rgba(18, 18, 21, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(20, 24, 29, 0.85);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(157, 190, 183, 0.18);
         }
         .conveyor-belt-scroll {
             animation: conveyorMove 2s linear infinite;
@@ -63,19 +66,19 @@
             height: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-            background: #09090b;
+            background: #0d0f12;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #27272a;
+            background: #9dbeb7;
             border-radius: 4px;
         }
-        /* Custom Leaflet Dark Popups & Animated Map Markers */
+        /* Custom Leaflet Dark Popups & Animated Map Markers with Curated Palette */
         .leaflet-popup-content-wrapper {
-            background: #09090b !important;
-            color: #f4f4f5 !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            background: #0d0f12 !important;
+            color: #efe6d5 !important;
+            border: 1px solid rgba(157, 190, 183, 0.3) !important;
             border-radius: 14px !important;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.8) !important;
             padding: 0 !important;
         }
         .leaflet-popup-content {
@@ -83,11 +86,11 @@
             line-height: 1.4 !important;
         }
         .leaflet-popup-tip {
-            background: #09090b !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            background: #0d0f12 !important;
+            border: 1px solid rgba(157, 190, 183, 0.3) !important;
         }
         .leaflet-container {
-            background: #09090b !important;
+            background: #0d0f12 !important;
             font-family: 'Outfit', sans-serif !important;
         }
         .marker-pulse {
@@ -104,8 +107,8 @@
             animation: mapPulse 2s infinite;
         }
         @keyframes mapPulse {
-            0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1.6); opacity: 0; box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 0 0 rgba(231, 50, 19, 0.7); }
+            70% { transform: scale(1.6); opacity: 0; box-shadow: 0 0 0 10px rgba(231, 50, 19, 0); }
             100% { transform: scale(1); opacity: 0; }
         }
         .route-flow-line {
@@ -537,9 +540,9 @@
 
             if (loading) {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen bg-darkBg text-white font-mono">
-                        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-emerald-400">Loading SmartWaste Intelligence Twin...</p>
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-darkBg text-paletteCream font-mono">
+                        <div className="w-12 h-12 border-4 border-[#e73213] border-t-transparent rounded-full animate-spin"></div>
+                        <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-[#9dbeb7]">Loading SmartWaste Intelligence Twin...</p>
                     </div>
                 );
             }
@@ -550,17 +553,17 @@
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-glassBorder pb-5 gap-4">
                         <div>
                             <div className="flex items-center gap-2">
-                                <h1 className="text-xl font-bold text-white tracking-tight uppercase">SmartWasteAI Operations Engine</h1>
-                                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-500/30">CHENNAI ULB LIVE TWIN</span>
+                                <h1 className="text-xl font-bold text-paletteCream tracking-tight uppercase">SmartWasteAI Operations Engine</h1>
+                                <span className="bg-[#e73213]/20 text-[#e73213] text-[10px] font-bold px-2.5 py-0.5 rounded border border-[#e73213]/40">CHENNAI ULB LIVE TWIN</span>
                             </div>
-                            <p className="text-xs text-zinc-400 mt-1">Autonomous CV Sorting, Quantum Optimization & Cross-ULB Diversion Control</p>
+                            <p className="text-xs text-[#9dbeb7] mt-1">Autonomous CV Sorting, Quantum Optimization & Cross-ULB Diversion Control</p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <button onClick={() => toggleCameraMode()} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs px-3 py-2 rounded-xl border border-zinc-700 transition flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full ${cameraMode === 'simulation' ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400'}`}></span>
+                            <button onClick={() => toggleCameraMode()} className="bg-[#14181d] hover:bg-zinc-800 text-[#efe6d5] font-bold text-xs px-3.5 py-2 rounded-xl border border-glassBorder transition flex items-center gap-2">
+                                <span className={`w-2.5 h-2.5 rounded-full ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] animate-pulse' : 'bg-[#e73213]'}`}></span>
                                 Camera: {cameraMode === 'simulation' ? 'Simulation Mode' : 'Hardware Mode'}
                             </button>
-                            <button onClick={runSimulation} disabled={simulating} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl border border-emerald-400 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50">
+                            <button onClick={runSimulation} disabled={simulating} className="bg-[#e73213] hover:bg-[#c8290e] text-white font-bold text-xs px-4 py-2 rounded-xl border border-[#e73213] transition flex items-center gap-2 shadow-lg shadow-[#e73213]/30 disabled:opacity-50">
                                 <Icon name="zap" className="w-4 h-4" />
                                 {simulating ? "Simulating System..." : "Simulate Full Workflow & Conveyor"}
                             </button>
@@ -570,46 +573,46 @@
                     {/* Top Summary Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="info-panel p-4 rounded-2xl">
-                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Unallocated Batches</span>
-                            <div className="text-2xl font-bold text-white mt-1">{unallocated.length}</div>
-                            <span className="text-[10px] text-amber-400 font-medium">In Transfer Station Queue</span>
+                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Unallocated Batches</span>
+                            <div className="text-2xl font-bold text-[#e73213] mt-1">{unallocated.length}</div>
+                            <span className="text-[10px] text-[#efe6d5]/70 font-medium">In Transfer Station Queue</span>
                         </div>
                         <div className="info-panel p-4 rounded-2xl">
-                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Active Fleet Count</span>
-                            <div className="text-2xl font-bold text-emerald-400 mt-1">{(summary && summary.trucks && summary.trucks.length) || 0}</div>
-                            <span className="text-[10px] text-emerald-400 font-medium">GPS Telemetry Tracked</span>
+                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Active Fleet Count</span>
+                            <div className="text-2xl font-bold text-[#efe6d5] mt-1">{(summary && summary.trucks && summary.trucks.length) || 0}</div>
+                            <span className="text-[10px] text-[#9dbeb7] font-medium">GPS Telemetry Tracked</span>
                         </div>
                         <div className="info-panel p-4 rounded-2xl">
-                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Treatment Plants</span>
-                            <div className="text-2xl font-bold text-sky-400 mt-1">{(summary && summary.plants && summary.plants.length) || 0}</div>
-                            <span className="text-[10px] text-sky-400 font-medium">Compost / Bio-CNG / WtE</span>
+                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Treatment Plants</span>
+                            <div className="text-2xl font-bold text-[#9dbeb7] mt-1">{(summary && summary.plants && summary.plants.length) || 0}</div>
+                            <span className="text-[10px] text-[#9dbeb7]/80 font-medium">Compost / Bio-CNG / WtE</span>
                         </div>
                         <div className="info-panel p-4 rounded-2xl">
-                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Diversion Recovery</span>
-                            <div className="text-2xl font-bold text-purple-400 mt-1">78.4%</div>
-                            <span className="text-[10px] text-purple-400 font-medium">Diverted from Landfills</span>
+                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Diversion Recovery</span>
+                            <div className="text-2xl font-bold text-[#e73213] mt-1">78.4%</div>
+                            <span className="text-[10px] text-[#efe6d5]/80 font-medium">Diverted from Landfills</span>
                         </div>
                     </div>
 
                     {/* Navigation Tabs */}
-                    <div className="info-panel p-5 rounded-2xl bg-[#09090b] border border-zinc-800">
-                        <div className="flex border-b border-zinc-800 mb-4 gap-4 overflow-x-auto custom-scrollbar pb-1">
-                            <button onClick={() => setActiveTab('batches')} className={activeTab === 'batches' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-emerald-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                    <div className="info-panel p-5 rounded-2xl bg-[#14181d] border border-glassBorder">
+                        <div className="flex border-b border-glassBorder mb-4 gap-4 overflow-x-auto custom-scrollbar pb-1">
+                            <button onClick={() => setActiveTab('batches')} className={activeTab === 'batches' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#e73213] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Unallocated Batches ({unallocated.length})
                             </button>
-                            <button onClick={() => setActiveTab('trucks')} className={activeTab === 'trucks' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-amber-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                            <button onClick={() => setActiveTab('trucks')} className={activeTab === 'trucks' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#e73213] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Simulated Fleet ({(summary && summary.trucks && summary.trucks.length) || 0})
                             </button>
-                            <button onClick={() => setActiveTab('transit')} className={activeTab === 'transit' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-purple-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                            <button onClick={() => setActiveTab('transit')} className={activeTab === 'transit' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#9dbeb7] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Transit Centers Edge (Live)
                             </button>
-                            <button onClick={() => setActiveTab('db_viewer')} className={activeTab === 'db_viewer' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-sky-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                            <button onClick={() => setActiveTab('db_viewer')} className={activeTab === 'db_viewer' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#9dbeb7] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Database Viewer
                             </button>
-                            <button onClick={() => setActiveTab('matching')} className={activeTab === 'matching' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-amber-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                            <button onClick={() => setActiveTab('matching')} className={activeTab === 'matching' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#e73213] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Cross-ULB Matching Engine
                             </button>
-                            <button onClick={() => setActiveTab('diversion')} className={activeTab === 'diversion' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-emerald-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                            <button onClick={() => setActiveTab('diversion')} className={activeTab === 'diversion' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#e73213] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Diversion Metrics
                             </button>
                         </div>
@@ -847,35 +850,35 @@
                     </div>
 
                     {/* Leaflet GIS Map Container */}
-                    <div className="info-panel p-5 rounded-2xl bg-[#09090b] border border-zinc-800 space-y-4">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                    <div className="info-panel p-5 rounded-2xl bg-[#14181d] border border-glassBorder space-y-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-glassBorder pb-3">
                             <div>
-                                <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                                    <Icon name="map-pin" className="w-4 h-4 text-sky-400" />
+                                <h2 className="text-xs font-bold uppercase tracking-wider text-[#efe6d5] flex items-center gap-2">
+                                    <Icon name="map-pin" className="w-4 h-4 text-[#e73213]" />
                                     Smart City GIS Digital Twin Map (Chennai ULB Case Study)
                                 </h2>
-                                <p className="text-[11px] text-zinc-400 mt-0.5">100% Open Access Maps (Zero API Keys) &bull; Live Fleet & Treatment Facility Telemetry</p>
+                                <p className="text-[11px] text-[#9dbeb7] mt-0.5">100% Open Access Maps (Zero API Keys) &bull; Live Fleet & Treatment Facility Telemetry</p>
                             </div>
                             
                             {/* Layer & Control Action Buttons */}
                             <div className="flex items-center gap-2 flex-wrap">
                                 {/* Map Style Selector */}
-                                <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-[11px]">
-                                    <button onClick={() => switchMapStyle('cartoDark')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'cartoDark' ? 'bg-zinc-800 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                                <div className="flex bg-[#0d0f12] p-1 rounded-xl border border-glassBorder text-[11px]">
+                                    <button onClick={() => switchMapStyle('cartoDark')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'cartoDark' ? 'bg-[#e73213] text-white shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
                                         🌙 Dark
                                     </button>
-                                    <button onClick={() => switchMapStyle('esriSatellite')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'esriSatellite' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                                    <button onClick={() => switchMapStyle('esriSatellite')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'esriSatellite' ? 'bg-[#9dbeb7] text-[#0d0f12] shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
                                         🛰️ Satellite
                                     </button>
-                                    <button onClick={() => switchMapStyle('osmStandard')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'osmStandard' ? 'bg-sky-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                                    <button onClick={() => switchMapStyle('osmStandard')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'osmStandard' ? 'bg-[#efe6d5] text-[#0d0f12] shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
                                         🗺️ Street
                                     </button>
                                 </div>
                                 
-                                <button onClick={fitMapBounds} className="bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-zinc-800 transition">
+                                <button onClick={fitMapBounds} className="bg-[#0d0f12] hover:bg-zinc-800 text-[#efe6d5] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-glassBorder transition">
                                     Fit All Markers
                                 </button>
-                                <button onClick={focusLiveEdge} className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-purple-500/40 transition">
+                                <button onClick={focusLiveEdge} className="bg-[#e73213]/20 hover:bg-[#e73213]/40 text-[#e73213] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#e73213]/40 transition">
                                     Focus Live Edge
                                 </button>
                             </div>
@@ -883,27 +886,27 @@
 
                         {/* Interactive Category Filter Pills */}
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[11px] font-bold">
-                            <button onClick={() => setMapFilter('all')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'all' ? 'bg-white text-zinc-950 border-white shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                            <button onClick={() => setMapFilter('all')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'all' ? 'bg-[#efe6d5] text-[#0d0f12] border-[#efe6d5] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 All Locations
                             </button>
-                            <button onClick={() => setMapFilter('wte')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'wte' ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                            <button onClick={() => setMapFilter('wte')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'wte' ? 'bg-[#e73213] text-white border-[#e73213] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 ⚡ WtE & Gasification
                             </button>
-                            <button onClick={() => setMapFilter('compost')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'compost' ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                            <button onClick={() => setMapFilter('compost')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'compost' ? 'bg-[#9dbeb7] text-[#0d0f12] border-[#9dbeb7] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 🌱 Composting & Bio-CNG
                             </button>
-                            <button onClick={() => setMapFilter('recycling')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'recycling' ? 'bg-sky-500 text-zinc-950 border-sky-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                            <button onClick={() => setMapFilter('recycling')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'recycling' ? 'bg-[#efe6d5] text-[#0d0f12] border-[#efe6d5] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 ♻️ Recycling Plants
                             </button>
-                            <button onClick={() => setMapFilter('transfer')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'transfer' ? 'bg-purple-500 text-white border-purple-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                            <button onClick={() => setMapFilter('transfer')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'transfer' ? 'bg-[#9dbeb7] text-[#0d0f12] border-[#9dbeb7] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 📦 Transfer Hubs
                             </button>
-                            <button onClick={() => setMapFilter('fleet')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'fleet' ? 'bg-emerald-600 text-white border-emerald-400 shadow' : 'bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200'}`}>
+                            <button onClick={() => setMapFilter('fleet')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'fleet' ? 'bg-[#e73213] text-white border-[#e73213] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 🚛 Active Fleet
                             </button>
                         </div>
 
-                        <div ref={mapContainerRef} className="flex-1 rounded-xl border border-zinc-800 overflow-hidden shadow-2xl" style={{ height: '420px', width: '100%' }}></div>
+                        <div ref={mapContainerRef} className="flex-1 rounded-xl border border-glassBorder overflow-hidden shadow-2xl" style={{ height: '420px', width: '100%' }}></div>
                     </div>
                 </div>
             );
