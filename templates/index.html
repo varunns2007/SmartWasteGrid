@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartWasteAI - AI-Powered Waste Logistics & Sorting Platform</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Leaflet Map CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- React & Babel CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#09090b',
+                        cardBg: '#121215',
+                        glassBorder: 'rgba(255, 255, 255, 0.08)',
+                        accentPurple: '#8b5cf6',
+                        accentBlue: '#3b82f6',
+                        accentGreen: '#10b981',
+                        accentAmber: '#f59e0b',
+                        accentRose: '#f43f5e'
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #09090b;
+            color: #f4f4f5;
+            font-family: 'Outfit', sans-serif;
+        }
+        .info-panel {
+            background: rgba(18, 18, 21, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .conveyor-belt-scroll {
+            animation: conveyorMove 2s linear infinite;
+        }
+        @keyframes conveyorMove {
+            0% { background-position: 0 0; }
+            100% { background-position: 40px 0; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-darkBg text-zinc-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        {% raw %}
+        const { useState, useEffect, useRef } = React;
+
+        const Icon = ({ name, className = "w-5 h-5", color = "currentColor" }) => {
+            const svgProps = {
+                className,
+                stroke: color,
+                strokeWidth: 2,
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                fill: "none",
+                viewBox: "0 0 24 24",
+                width: "24",
+                height: "24"
+            };
+
+            switch (name) {
+                case "zap": return (<svg {...svgProps}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>);
+                case "play": return (<svg {...svgProps}><polygon points="5 3 19 12 5 21 5 3" /></svg>);
+                case "truck": return (<svg {...svgProps}><rect x="1" y="3" width="15" height="13" rx="2" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>);
+                case "scale": return (<svg {...svgProps}><polygon points="12 3 20 8 12 13 4 8 12 3" /><path d="M12 13v8M4 8v6c0 4.4 3.6 8 8 8s8-3.6 8-8V8" /></svg>);
+                case "activity": return (<svg {...svgProps}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>);
+                case "bar-chart": return (<svg {...svgProps}><path d="M3 3v18h18" /><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" /></svg>);
+                case "cpu": return (<svg {...svgProps}><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" /></svg>);
+                case "map-pin": return (<svg {...svgProps}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>);
+                default: return null;
+            }
+        };
+
+        const App = () => {
+            const [summary, setSummary] = useState(null);
+            const [unallocated, setUnallocated] = useState([]);
+            const [forecasts, setForecasts] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [simulating, setSimulating] = useState(false);
+            const [numBatchesToSimulate, setNumBatchesToSimulate] = useState(3);
+            const [solverMode, setSolverMode] = useState('cnn_milp');
+            const [lastRunDetails, setLastRunDetails] = useState(null);
+            const [selectedBatchDetails, setSelectedBatchDetails] = useState(null);
+            const [activeTab, setActiveTab] = useState('batches');
+            const [activeForecastingZone, setActiveForecastingZone] = useState('Zone 9 (Teynampet)');
+
+            const [activeTransitStation, setActiveTransitStation] = useState("Mylapore Transfer Station");
+            const [transitTelemetry, setTransitTelemetry] = useState(null);
+            const [transitConveyorLogs, setTransitConveyorLogs] = useState([]);
+            const [transitLiveMode, setTransitLiveMode] = useState(true);
+
+            // Extension States
+            const [dbSubTab, setDbSubTab] = useState('detections');
+            const [dbDetections, setDbDetections] = useState(null);
+            const [dbBatches, setDbBatches] = useState(null);
+            const [dbFacilities, setDbFacilities] = useState(null);
+            const [dbRoutingLogs, setDbRoutingLogs] = useState(null);
+            const [dbCategoryFilter, setDbCategoryFilter] = useState('all');
+            const [dbStationFilter, setDbStationFilter] = useState('');
+            const [dbPage, setDbPage] = useState(1);
+
+            const [matchingData, setMatchingData] = useState(null);
+            const [diversionData, setDiversionData] = useState(null);
+
+            const mapContainerRef = useRef(null);
+            const mapInstance = useRef(null);
+            const mapMarkersGroup = useRef(null);
+            const animatedTrucksGroup = useRef(null);
+
+            const fetchData = async () => {
+                try {
+                    const [sumRes, unRes, foreRes] = await Promise.all([
+                        fetch('/api/dashboard/summary').then(r => r.json()),
+                        fetch('/api/batches/unallocated').then(r => r.json()),
+                        fetch('/api/forecasting').then(r => r.json())
+                    ]);
+                    setSummary(sumRes);
+                    setUnallocated(unRes);
+                    setForecasts(foreRes);
+                } catch (err) {
+                    console.error("Error fetching dashboard data:", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const fetchExtensionData = async () => {
+                try {
+                    if (activeTab === 'db_viewer') {
+                        if (dbSubTab === 'detections') {
+                            const res = await fetch(`/api/database/detections?page=${dbPage}&category=${dbCategoryFilter}&station=${dbStationFilter}`).then(r => r.json());
+                            setDbDetections(res);
+                        } else if (dbSubTab === 'batches') {
+                            const res = await fetch(`/api/database/batches?page=${dbPage}`).then(r => r.json());
+                            setDbBatches(res);
+                        } else if (dbSubTab === 'facilities') {
+                            const res = await fetch('/api/database/facilities').then(r => r.json());
+                            setDbFacilities(res);
+                        } else if (dbSubTab === 'routing') {
+                            const res = await fetch('/api/database/routing-logs').then(r => r.json());
+                            setDbRoutingLogs(res);
+                        }
+                    } else if (activeTab === 'matching') {
+                        const res = await fetch('/api/matching/status').then(r => r.json());
+                        setMatchingData(res);
+                    } else if (activeTab === 'diversion') {
+                        const res = await fetch('/api/metrics/diversion').then(r => r.json());
+                        setDiversionData(res);
+                    }
+                } catch (err) {
+                    console.error("Error fetching extension data:", err);
+                }
+            };
+
+            useEffect(() => {
+                fetchData();
+                fetch('/api/camera/mode').then(r => r.json()).then(res => {
+                    if (res && res.mode) setCameraMode(res.mode);
+                }).catch(err => console.error(err));
+            }, []);
+
+            useEffect(() => {
+                fetchExtensionData();
+                const intervalId = setInterval(() => {
+                    if (activeTab === 'db_viewer' || activeTab === 'matching' || activeTab === 'diversion') {
+                        fetchExtensionData();
+                    }
+                }, 3500);
+                return () => clearInterval(intervalId);
+            }, [activeTab, dbSubTab, dbPage, dbCategoryFilter, dbStationFilter]);
+
+            useEffect(() => {
+                let intervalId = null;
+                if (transitLiveMode && activeTab === 'transit') {
+                    const fetchTick = async () => {
+                        try {
+                            const res = await fetch(`/api/transit-centers/telemetry?station_name=${encodeURIComponent(activeTransitStation)}`).then(r => r.json());
+                            setTransitTelemetry(res);
+                            setTransitConveyorLogs(prev => [res, ...prev.slice(0, 19)]);
+                        } catch (err) {
+                            console.error("Error fetching live conveyor tick:", err);
+                        }
+                    };
+                    fetchTick();
+                    intervalId = setInterval(fetchTick, 1000);
+                }
+                return () => {
+                    if (intervalId) clearInterval(intervalId);
+                };
+            }, [transitLiveMode, activeTab, activeTransitStation]);
+
+            useEffect(() => {
+                if (mapContainerRef.current && !mapInstance.current && !loading) {
+                    mapInstance.current = L.map(mapContainerRef.current, {
+                        center: [13.04, 80.22],
+                        zoom: 11,
+                        zoomControl: true
+                    });
+
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap &copy; CARTO',
+                        subdomains: 'abcd',
+                        maxZoom: 19
+                    }).addTo(mapInstance.current);
+
+                    mapMarkersGroup.current = L.layerGroup().addTo(mapInstance.current);
+                    animatedTrucksGroup.current = L.layerGroup().addTo(mapInstance.current);
+                }
+            }, [loading]);
+
+            useEffect(() => {
+                if (mapInstance.current && mapMarkersGroup.current && summary) {
+                    mapInstance.current.invalidateSize();
+                    mapMarkersGroup.current.clearLayers();
+
+                    summary.plants.forEach(plant => {
+                        const plantIcon = L.divIcon({
+                            html: `<div class="w-8 h-8 rounded-full bg-blue-600 border-2 border-slate-900 flex items-center justify-center shadow-lg shadow-blue-500/40">
+                                     <span class="text-[10px] font-bold text-white">P</span>
+                                   </div>`,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 16]
+                        });
+
+                        L.marker([plant.lat, plant.lng], { icon: plantIcon })
+                            .bindPopup(`<b>${plant.name}</b><br/>Type: ${plant.technology_type}`)
+                            .addTo(mapMarkersGroup.current);
+                    });
+                }
+            }, [summary]);
+
+            const [cameraMode, setCameraMode] = useState('hardware');
+            const [cameraIdx, setCameraIdx] = useState(1);
+
+            const toggleCameraMode = async (newMode, targetIdx) => {
+                const modeToSet = newMode || (cameraMode === 'simulation' ? 'hardware' : 'simulation');
+                const indexToSet = targetIdx !== undefined ? targetIdx : cameraIdx;
+                try {
+                    const res = await fetch('/api/camera/mode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: modeToSet, camera_index: indexToSet })
+                    }).then(r => r.json());
+                    setCameraMode(res.mode);
+                    if (res.camera_index !== undefined) setCameraIdx(res.camera_index);
+                } catch (err) {
+                    console.error("Error setting camera mode:", err);
+                }
+            };
+
+            const runSimulation = async () => {
+                setSimulating(true);
+                try {
+                    await toggleCameraMode('simulation');
+                    const [wfRes, convRes] = await Promise.all([
+                        fetch('/api/workflow', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ num_batches: numBatchesToSimulate, solver_mode: solverMode })
+                        }).then(r => r.json()),
+                        fetch('/api/conveyor/simulate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ count: numBatchesToSimulate })
+                        }).then(r => r.json())
+                    ]);
+                    setLastRunDetails(wfRes);
+                    fetchData();
+                    fetchExtensionData();
+                } catch (err) {
+                    console.error("Simulation error:", err);
+                } finally {
+                    setSimulating(false);
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-darkBg text-white font-mono">
+                        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-emerald-400">Loading SmartWaste Intelligence Twin...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-glassBorder pb-5 gap-4">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-xl font-bold text-white tracking-tight uppercase">SmartWasteAI Operations Engine</h1>
+                                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-500/30">CHENNAI ULB LIVE TWIN</span>
+                            </div>
+                            <p className="text-xs text-zinc-400 mt-1">Autonomous CV Sorting, Quantum Optimization & Cross-ULB Diversion Control</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => toggleCameraMode()} className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs px-3 py-2 rounded-xl border border-zinc-700 transition flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${cameraMode === 'simulation' ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400'}`}></span>
+                                Camera: {cameraMode === 'simulation' ? 'Simulation Mode' : 'Hardware Mode'}
+                            </button>
+                            <button onClick={runSimulation} disabled={simulating} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl border border-emerald-400 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50">
+                                <Icon name="zap" className="w-4 h-4" />
+                                {simulating ? "Simulating System..." : "Simulate Full Workflow & Conveyor"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Top Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="info-panel p-4 rounded-2xl">
+                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Unallocated Batches</span>
+                            <div className="text-2xl font-bold text-white mt-1">{unallocated.length}</div>
+                            <span className="text-[10px] text-amber-400 font-medium">In Transfer Station Queue</span>
+                        </div>
+                        <div className="info-panel p-4 rounded-2xl">
+                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Active Fleet Count</span>
+                            <div className="text-2xl font-bold text-emerald-400 mt-1">{(summary && summary.trucks && summary.trucks.length) || 0}</div>
+                            <span className="text-[10px] text-emerald-400 font-medium">GPS Telemetry Tracked</span>
+                        </div>
+                        <div className="info-panel p-4 rounded-2xl">
+                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Treatment Plants</span>
+                            <div className="text-2xl font-bold text-sky-400 mt-1">{(summary && summary.plants && summary.plants.length) || 0}</div>
+                            <span className="text-[10px] text-sky-400 font-medium">Compost / Bio-CNG / WtE</span>
+                        </div>
+                        <div className="info-panel p-4 rounded-2xl">
+                            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Diversion Recovery</span>
+                            <div className="text-2xl font-bold text-purple-400 mt-1">78.4%</div>
+                            <span className="text-[10px] text-purple-400 font-medium">Diverted from Landfills</span>
+                        </div>
+                    </div>
+
+                    {/* Navigation Tabs */}
+                    <div className="info-panel p-5 rounded-2xl bg-[#09090b] border border-zinc-800">
+                        <div className="flex border-b border-zinc-800 mb-4 gap-4 overflow-x-auto custom-scrollbar pb-1">
+                            <button onClick={() => setActiveTab('batches')} className={activeTab === 'batches' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-emerald-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                                Unallocated Batches ({unallocated.length})
+                            </button>
+                            <button onClick={() => setActiveTab('trucks')} className={activeTab === 'trucks' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-amber-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                                Simulated Fleet ({(summary && summary.trucks && summary.trucks.length) || 0})
+                            </button>
+                            <button onClick={() => setActiveTab('transit')} className={activeTab === 'transit' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-purple-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                                Transit Centers Edge (Live)
+                            </button>
+                            <button onClick={() => setActiveTab('db_viewer')} className={activeTab === 'db_viewer' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-sky-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                                Database Viewer
+                            </button>
+                            <button onClick={() => setActiveTab('matching')} className={activeTab === 'matching' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-amber-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                                Cross-ULB Matching Engine
+                            </button>
+                            <button onClick={() => setActiveTab('diversion')} className={activeTab === 'diversion' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-emerald-400 text-white" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-zinc-500 hover:text-zinc-300"}>
+                                Diversion Metrics
+                            </button>
+                        </div>
+
+                        {/* Unallocated Tab */}
+                        {activeTab === 'batches' && (
+                            <div className="overflow-x-auto custom-scrollbar max-h-64">
+                                {unallocated.length === 0 ? (
+                                    <div className="text-center text-gray-500 py-12 text-xs">No active unallocated waste batches in queue.</div>
+                                ) : (
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-glassBorder text-gray-400 uppercase font-semibold">
+                                                <th className="py-2.5 px-3">Batch ID</th>
+                                                <th className="py-2.5 px-3">Transfer Station</th>
+                                                <th className="py-2.5 px-3">Weight</th>
+                                                <th className="py-2.5 px-3">Moisture</th>
+                                                <th className="py-2.5 px-3 text-emerald-400">Org %</th>
+                                                <th className="py-2.5 px-3 text-sky-400">Rec %</th>
+                                                <th className="py-2.5 px-3 text-rose-400">Haz %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-800/60 text-gray-300">
+                                            {unallocated.map(b => (
+                                                <tr key={b.id} className="hover:bg-white/[0.02]">
+                                                    <td className="py-2.5 px-3 font-mono">BATCH-{b.id}</td>
+                                                    <td className="py-2.5 px-3 font-bold text-white">{b.transfer_station_name || "Mylapore TS"}</td>
+                                                    <td className="py-2.5 px-3 font-mono">{b.weight_tons} Tons</td>
+                                                    <td className="py-2.5 px-3 font-mono">{b.moisture_percentage}%</td>
+                                                    <td className="py-2.5 px-3 font-mono text-emerald-400 font-bold">{b.organic_percentage}%</td>
+                                                    <td className="py-2.5 px-3 font-mono text-sky-400 font-bold">{b.recyclable_percentage}%</td>
+                                                    <td className="py-2.5 px-3 font-mono text-rose-400 font-bold">{b.hazardous_percentage}%</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Transit Edge Camera Tab */}
+                        {activeTab === 'transit' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
+                                    <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                                        <Icon name="activity" className="w-4 h-4 text-purple-400" />
+                                        Transit Centres Edge Optical Stream
+                                    </h3>
+                                    <button onClick={() => setTransitLiveMode(!transitLiveMode)} className="text-[10px] font-bold uppercase px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-gray-300">
+                                        {transitLiveMode ? "Pause Feed" : "Resume Feed"}
+                                    </button>
+                                </div>
+
+                                <div className="w-full max-w-4xl mx-auto relative rounded-2xl border-2 border-emerald-500/30 bg-zinc-950 overflow-hidden shadow-2xl flex items-center justify-center min-h-[380px]">
+                                    <img src="/video_feed" className="w-full max-h-[420px] object-contain rounded-xl bg-black" alt="Live Transit Edge Optical Camera Feed" />
+                                    <div className="absolute top-3 right-3 bg-zinc-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-500/50 text-xs font-mono text-emerald-300 flex items-center gap-2 shadow-lg">
+                                        <span className={`w-2.5 h-2.5 rounded-full ${cameraMode === 'simulation' ? 'bg-purple-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`}></span>
+                                        <span className="font-bold">{cameraMode === 'simulation' ? 'SIMULATED DIGITAL TWIN FEED' : 'LIVE HARDWARE FEED'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row items-center justify-between bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 gap-3">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-white">
+                                            {cameraMode === 'simulation' 
+                                                ? "Camera Mode: Simulated Conveyor Digital Twin" 
+                                                : `Camera Mode: Live Hardware Webcam (Index ${cameraIdx})`}
+                                        </span>
+                                        <span className="text-[11px] text-zinc-400 mt-0.5">
+                                            {cameraMode === 'simulation' 
+                                                ? "Streaming animated conveyor belt with real-time AI waste tracking & DB logging." 
+                                                : cameraIdx === 1 ? "Connected to USB2.0 External PC Webcam (Index 1)." : "Connected to Integrated Laptop Camera (Index 0)."}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <button onClick={() => toggleCameraMode('hardware', 1)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'hardware' && cameraIdx === 1 ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}>
+                                            USB Webcam (Cam 1)
+                                        </button>
+                                        <button onClick={() => toggleCameraMode('hardware', 0)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'hardware' && cameraIdx === 0 ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}>
+                                            Laptop Cam (Cam 0)
+                                        </button>
+                                        <button onClick={() => toggleCameraMode('simulation')} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'simulation' ? 'bg-purple-600 border-purple-400 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}>
+                                            Simulation Mode
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 1. Database Viewer Tab */}
+                        {activeTab === 'db_viewer' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
+                                    <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                                        <Icon name="cpu" className="w-4 h-4 text-sky-400" />
+                                        Live Database Viewer & Audit Ledger
+                                    </h3>
+                                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-500/30">
+                                        LIVE SYNC: {(dbDetections && dbDetections.last_synced) || "SYNCHRONIZED"}
+                                    </span>
+                                </div>
+
+                                <div className="flex gap-2 border-b border-zinc-800 pb-2">
+                                    <button onClick={() => { setDbSubTab('detections'); setDbPage(1); }} className={dbSubTab === "detections" ? "px-3 py-1.5 text-xs font-bold rounded-lg border bg-sky-500/20 text-sky-300 border-sky-500/40" : "px-3 py-1.5 text-xs font-bold rounded-lg border bg-zinc-900 text-gray-400 border-zinc-800"}>
+                                        1. Detections Table
+                                    </button>
+                                    <button onClick={() => { setDbSubTab('batches'); setDbPage(1); }} className={dbSubTab === "batches" ? "px-3 py-1.5 text-xs font-bold rounded-lg border bg-sky-500/20 text-sky-300 border-sky-500/40" : "px-3 py-1.5 text-xs font-bold rounded-lg border bg-zinc-900 text-gray-400 border-zinc-800"}>
+                                        2. Batch Composition
+                                    </button>
+                                    <button onClick={() => setDbSubTab('facilities')} className={dbSubTab === "facilities" ? "px-3 py-1.5 text-xs font-bold rounded-lg border bg-sky-500/20 text-sky-300 border-sky-500/40" : "px-3 py-1.5 text-xs font-bold rounded-lg border bg-zinc-900 text-gray-400 border-zinc-800"}>
+                                        3. Facility Capacities
+                                    </button>
+                                    <button onClick={() => setDbSubTab('routing')} className={dbSubTab === "routing" ? "px-3 py-1.5 text-xs font-bold rounded-lg border bg-sky-500/20 text-sky-300 border-sky-500/40" : "px-3 py-1.5 text-xs font-bold rounded-lg border bg-zinc-900 text-gray-400 border-zinc-800"}>
+                                        4. Routing Decision Audit Log
+                                    </button>
+                                </div>
+
+                                {dbSubTab === 'detections' && (
+                                    <div className="overflow-x-auto rounded-xl border border-glassBorder bg-zinc-950/60">
+                                        <table className="w-full text-left text-xs border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-glassBorder text-gray-400 uppercase font-semibold text-[10px] bg-zinc-900/80">
+                                                    <th className="py-2.5 px-4">Detection ID</th>
+                                                    <th className="py-2.5 px-4">Item Name</th>
+                                                    <th className="py-2.5 px-4">Class ID & Name</th>
+                                                    <th className="py-2.5 px-4">Confidence %</th>
+                                                    <th className="py-2.5 px-4">Mass (kg)</th>
+                                                    <th className="py-2.5 px-4">Camera ID</th>
+                                                    <th className="py-2.5 px-4">Sorting Decision</th>
+                                                    <th className="py-2.5 px-4">Timestamp</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-800/60 text-gray-300">
+                                                {(!dbDetections || !dbDetections.items || dbDetections.items.length === 0) ? (
+                                                    <tr><td colSpan="8" className="py-8 text-center text-gray-500 italic">No detections recorded in database query.</td></tr>
+                                                ) : (
+                                                    dbDetections.items.map(item => (
+                                                        <tr key={item.id} className="hover:bg-white/[0.02]">
+                                                            <td className="py-2.5 px-4 font-mono text-gray-400">#{item.id}</td>
+                                                            <td className="py-2.5 px-4 font-bold text-white">{item.item_name}</td>
+                                                            <td className="py-2.5 px-4">
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-sky-500/20 text-sky-300 border-sky-500/30">
+                                                                    {item.class_id}: {item.class_name.toUpperCase()}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2.5 px-4 font-mono text-purple-300">{(item.confidence * 100).toFixed(1)}%</td>
+                                                            <td className="py-2.5 px-4 font-mono">{item.item_weight_kg} kg</td>
+                                                            <td className="py-2.5 px-4 font-mono text-gray-400">{item.camera_id}</td>
+                                                            <td className="py-2.5 px-4 font-bold text-white">{item.sorting_decision}</td>
+                                                            <td className="py-2.5 px-4 font-mono text-[11px] text-gray-500">{item.timestamp}</td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 2. Cross-ULB Matching Engine Tab */}
+                        {activeTab === 'matching' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
+                                    <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                                        <Icon name="cpu" className="w-4 h-4 text-amber-400" />
+                                        Cross-ULB Waste Matching & Escalation Engine Panel
+                                    </h3>
+                                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-500/30">ACTIVE</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {(!matchingData || !matchingData.recent_batches) ? (
+                                        <div className="col-span-full py-8 text-center text-gray-500">Loading matching engine data...</div>
+                                    ) : (
+                                        matchingData.recent_batches.map(item => (
+                                            <div key={item.id} className="bg-zinc-950 p-4 rounded-xl border border-glassBorder space-y-3">
+                                                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                                                    <span className="text-xs font-mono font-bold text-gray-300">BATCH-{item.batch_id} ({item.source_ulb})</span>
+                                                    <span className="px-2.5 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                                                        {item.escalation_status}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-1.5 text-xs">
+                                                    <div className="flex justify-between text-gray-400">
+                                                        <span>Destination Route:</span>
+                                                        <strong className="text-white">{item.matched_facility}</strong>
+                                                    </div>
+                                                    <div className="flex justify-between text-gray-400">
+                                                        <span>Transit Distance:</span>
+                                                        <strong className="text-sky-300">{item.distance_km} km</strong>
+                                                    </div>
+                                                    <div className="flex justify-between text-gray-400">
+                                                        <span>Transport Cost:</span>
+                                                        <strong className="text-emerald-300">&#8377;{item.cost_factor_inr}</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. Diversion Metrics Tab */}
+                        {activeTab === 'diversion' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
+                                    <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                                        <Icon name="bar-chart" className="w-4 h-4 text-emerald-400" />
+                                        Statewide & District Diversion Metrics Dashboard
+                                    </h3>
+                                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-500/30">SUSTAINABILITY METRICS</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="bg-emerald-950/40 p-4 rounded-xl border border-emerald-500/30">
+                                        <div className="text-[10px] font-semibold text-emerald-400 uppercase">Statewide Diversion Rate</div>
+                                        <div className="text-3xl font-bold text-white mt-1">{(diversionData && diversionData.statewide_diversion_pct) || 78.4}%</div>
+                                    </div>
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-glassBorder">
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase">Pre-System Baseline</div>
+                                        <div className="text-3xl font-bold text-gray-300 mt-1">32.5%</div>
+                                    </div>
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-glassBorder">
+                                        <div className="text-[10px] font-semibold text-sky-400 uppercase">Total Managed Waste</div>
+                                        <div className="text-2xl font-bold text-white mt-1">{(diversionData && diversionData.total_waste_managed_tons) || 7170} Tons</div>
+                                    </div>
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-glassBorder">
+                                        <div className="text-[10px] font-semibold text-purple-400 uppercase">Recovered Material</div>
+                                        <div className="text-2xl font-bold text-purple-200 mt-1">{(diversionData && diversionData.total_waste_recovered_tons) || 5530} Tons</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Leaflet GIS Map Container */}
+                    <div className="info-panel p-5 rounded-2xl bg-[#09090b] border border-zinc-800 space-y-3">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                            <Icon name="map-pin" className="w-4 h-4 text-sky-400" />
+                            Smart City GIS Digital Twin Map (Chennai Case Study)
+                        </h2>
+                        <div ref={mapContainerRef} className="flex-1 rounded-xl border border-zinc-800 overflow-hidden" style={{ height: '370px', width: '100%' }}></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+        {% endraw %}
+    </script>
+</body>
+</html>

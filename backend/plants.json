@@ -1,0 +1,52 @@
+[
+  {
+    "plant_id": "PLANT_001",
+    "name": "GreenCycle Resource Recovery Facility [DEMO]",
+    "type": "Recycling",
+    "latitude": 0.05,
+    "longitude": 0.05,
+    "capacity_kg": 50000.0,
+    "accepted_waste": ["recyclable", "dry"],
+    "transport_cost_per_km": 1.5
+  },
+  {
+    "plant_id": "PLANT_002",
+    "name": "EcoCompost Organic Processing Center [DEMO]",
+    "type": "Composting",
+    "latitude": -0.04,
+    "longitude": 0.03,
+    "capacity_kg": 30000.0,
+    "accepted_waste": ["wet"],
+    "transport_cost_per_km": 1.2
+  },
+  {
+    "plant_id": "PLANT_003",
+    "name": "BioGrid Energy & Biomethanation Plant [DEMO]",
+    "type": "Biomethanation",
+    "latitude": 0.08,
+    "longitude": -0.02,
+    "capacity_kg": 40000.0,
+    "accepted_waste": ["wet"],
+    "transport_cost_per_km": 1.8
+  },
+  {
+    "plant_id": "PLANT_004",
+    "name": "CleanThermal Waste-to-Energy Plant [DEMO]",
+    "type": "Waste-to-Energy",
+    "latitude": -0.07,
+    "longitude": -0.06,
+    "capacity_kg": 75000.0,
+    "accepted_waste": ["dry", "recyclable"],
+    "transport_cost_per_km": 2.0
+  },
+  {
+    "plant_id": "PLANT_005",
+    "name": "Advanced SynGas Synthesis Facility [DEMO]",
+    "type": "Gasification",
+    "latitude": 0.12,
+    "longitude": 0.01,
+    "capacity_kg": 25000.0,
+    "accepted_waste": ["dry"],
+    "transport_cost_per_km": 2.5
+  }
+]

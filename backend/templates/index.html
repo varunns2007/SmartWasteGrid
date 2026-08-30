@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartWasteAI - AI-Powered Waste Logistics & Sorting Platform</title>
+    <!-- Google Fonts: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        darkBg: '#000000',
+                        panelBg: '#09090b',
+                        glassBg: 'rgba(9, 9, 11, 0.85)',
+                        glassBorder: 'rgba(255, 255, 255, 0.08)',
+                        accentPurple: '#a855f7',
+                        accentBlue: '#38bdf8',
+                        accentGreen: '#10b981',
+                        accentTeal: '#14b8a6',
+                        accentOrange: '#f97316'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #000000;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(255, 255, 255, 0.03) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(255, 255, 255, 0.02) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+        .info-panel {
+            background: #09090b;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.8);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.01);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+        /* Leaflet custom map dark mode rules */
+        .leaflet-container {
+            background: #000000 !important;
+            font-family: 'Outfit', sans-serif;
+        }
+        .leaflet-bar a {
+            background-color: #09090b !important;
+            color: #fff !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        .leaflet-bar a:hover {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        .leaflet-popup-content-wrapper {
+            background: #09090b !important;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e4e4e7 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8) !important;
+        }
+        .leaflet-popup-tip {
+            background: #09090b !important;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        /* Moving conveyor animation */
+        @keyframes rollBelt {
+            0% { background-position-x: 0px; }
+            100% { background-position-x: 40px; }
+        }
+        .conveyor-belt-scroll {
+            animation: rollBelt 1.2s linear infinite;
+        }
+    </style>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet Map JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="text-gray-200 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+    {% raw %}
+        const { useState, useEffect, useRef } = React;
+
+        // Custom inline SVG icons to prevent Lucide DOM manipulation crashes in React
+        const Icon = ({ name, className = "w-5 h-5", color = "currentColor" }) => {
+            const svgProps = {
+                className,
+                stroke: color,
+                strokeWidth: 2,
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                fill: "none",
+                viewBox: "0 0 24 24",
+                width: "24",
+                height: "24"
+            };
+
+            switch (name) {
+                case "zap":
+                    return (
+                        <svg {...svgProps}>
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                        </svg>
+                    );
+                case "play":
+                    return (
+                        <svg {...svgProps}>
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                    );
+                case "truck":
+                    return (
+                        <svg {...svgProps}>
+                            <rect x="1" y="3" width="15" height="13" rx="2" ry="2" />
+                            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                            <circle cx="5.5" cy="18.5" r="2.5" />
+                            <circle cx="18.5" cy="18.5" r="2.5" />
+                        </svg>
+                    );
+                case "scale":
+                    return (
+                        <svg {...svgProps}>
+                            <polygon points="12 3 20 8 12 13 4 8 12 3" />
+                            <path d="M12 13v8M4 8v6c0 4.4 3.6 8 8 8s8-3.6 8-8V8" />
+                        </svg>
+                    );
+                case "gauge":
+                    return (
+                        <svg {...svgProps}>
+                            <path d="m12 14 4-4M3.34 19a10 10 0 1 1 17.32 0" />
+                        </svg>
+                    );
+                case "activity":
+                    return (
+                        <svg {...svgProps}>
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                    );
+                case "bar-chart":
+                    return (
+                        <svg {...svgProps}>
+                            <path d="M3 3v18h18" />
+                            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
+                        </svg>
+                    );
+                case "clock":
+                    return (
+                        <svg {...svgProps}>
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                    );
+                case "check-circle":
+                    return (
+                        <svg {...svgProps}>
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                    );
+                case "cpu":
+                    return (
+                        <svg {...svgProps}>
+                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                            <rect x="9" y="9" width="6" height="6" />
+                            <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
+                        </svg>
+                    );
+                case "settings":
+                    return (
+                        <svg {...svgProps}>
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
+                    );
+                case "map-pin":
+                    return (
+                        <svg {...svgProps}>
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                            <circle cx="12" cy="10" r="3" />
+                        </svg>
+                    );
+                case "navigation":
+                    return (
+                        <svg {...svgProps}>
+                            <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                        </svg>
+                    );
+                case "leaf":
+                    return (
+                        <svg {...svgProps}>
+                            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 3.58 2 8a9 9 0 0 1-9 9Z" />
+                            <path d="M19 10c-5.07-.1-6.9 1.8-10 9" />
+                        </svg>
+                    );
+                case "currency-inr":
+                    return (
+                        <svg {...svgProps}>
+                            <path d="M6 3h12M6 8h12M6 13h8.5M6 3v15M14.5 13a6 6 0 0 1 0 10M13 18l7 5" />
+                        </svg>
+                    );
+                default:
+                    return null;
+            }
+        };
+
+        const App = () => {
+            const [summary, setSummary] = useState(null);
+            const [unallocated, setUnallocated] = useState([]);
+            const [forecasts, setForecasts] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [simulating, setSimulating] = useState(false);
+            const [numBatchesToSimulate, setNumBatchesToSimulate] = useState(3);
+            const [solverMode, setSolverMode] = useState('cnn_milp');
+            const [lastRunDetails, setLastRunDetails] = useState(null);
+            const [selectedBatchDetails, setSelectedBatchDetails] = useState(null);
+            const [activeTab, setActiveTab] = useState('batches');
+            const [activeForecastingZone, setActiveForecastingZone] = useState('Zone 9 (Teynampet)');
+            
+            // Transit Center live telemetry states
+            const [activeTransitStation, setActiveTransitStation] = useState("Mylapore Transfer Station");
+            const [transitTelemetry, setTransitTelemetry] = useState(null);
+            const [transitConveyorLogs, setTransitConveyorLogs] = useState([]);
+            const [transitLiveMode, setTransitLiveMode] = useState(true);
+
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+            
+            const forecastChartRef = useRef(null);
+            const forecastChartInstance = useRef(null);
+            
+            // Leaflet Map Refs
+            const mapContainerRef = useRef(null);
+            const mapInstance = useRef(null);
+            const mapMarkersGroup = useRef(null);
+            const animatedTrucksGroup = useRef(null);
+
+            const fetchData = async () => {
+                try {
+                    const [sumRes, unRes, foreRes] = await Promise.all([
+                        fetch('/api/dashboard/summary').then(r => r.json()),
+                        fetch('/api/batches/unallocated').then(r => r.json()),
+                        fetch('/api/forecasting').then(r => r.json())
+                    ]);
+                    setSummary(sumRes);
+                    setUnallocated(unRes);
+                    setForecasts(foreRes);
+                } catch (err) {
+                    console.error("Error fetching dashboard data:", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchData();
+            }, []);
+
+            // Live Transit Center telemetry polling effect (ticks every second)
+            useEffect(() => {
+                let intervalId = null;
+                if (transitLiveMode && activeTab === 'transit') {
+                    const fetchTick = async () => {
+                        try {
+                            const res = await fetch(`/api/transit-centers/telemetry?station_name=${encodeURIComponent(activeTransitStation)}`).then(r => r.json());
+                            setTransitTelemetry(res);
+                            setTransitConveyorLogs(prev => [res, ...prev.slice(0, 19)]);
+                        } catch (err) {
+                            console.error("Error fetching live conveyor tick:", err);
+                        }
+                    };
+                    fetchTick();
+                    intervalId = setInterval(fetchTick, 1000);
+                }
+                return () => {
+                    if (intervalId) clearInterval(intervalId);
+                };
+            }, [transitLiveMode, activeTransitStation, activeTab]);
+
+            // Initialize Leaflet Map Centered on Chennai
+            useEffect(() => {
+                if (mapContainerRef.current && !mapInstance.current && !loading) {
+                    mapInstance.current = L.map(mapContainerRef.current, {
+                        center: [13.04, 80.22],
+                        zoom: 11,
+                        zoomControl: true
+                    });
+
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                        subdomains: 'abcd',
+                        maxZoom: 19
+                    }).addTo(mapInstance.current);
+
+                    mapMarkersGroup.current = L.layerGroup().addTo(mapInstance.current);
+                    animatedTrucksGroup.current = L.layerGroup().addTo(mapInstance.current);
+                }
+            }, [loading]);
+
+            // Render Map Markers for Plants, Trucks and Transfer Stations
+            useEffect(() => {
+                if (mapInstance.current && mapMarkersGroup.current && summary) {
+                    mapInstance.current.invalidateSize();
+                    mapMarkersGroup.current.clearLayers();
+
+                    // 1. Render Chennai Plants
+                    summary.plants.forEach(plant => {
+                        const plantIcon = L.divIcon({
+                            html: `<div class="w-8 h-8 rounded-full bg-blue-600 border-2 border-slate-900 flex items-center justify-center shadow-lg shadow-blue-500/40 hover:scale-110 transition-transform">
+                                     <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5"></path></svg>
+                                   </div>`,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 16]
+                        });
+
+                        L.marker([plant.lat, plant.lng], { icon: plantIcon })
+                            .bindPopup(`
+                                <div class="text-xs space-y-1 font-sans text-gray-200">
+                                    <h3 class="font-bold text-sm text-blue-400 border-b border-glassBorder pb-1 mb-1">${plant.name}</h3>
+                                    <div><b>Technology:</b> ${plant.technology_type}</div>
+                                    <div><b>Capacity Util:</b> ${plant.utilization} / ${plant.capacity} Tons (${plant.utilization_pct}%)</div>
+                                    <div><b>Thermal Heat Recovered:</b> ${plant.recovered_heat_mw} MW</div>
+                                    <div><b>Available Drying Heat:</b> ${plant.available_heat_mw} MW</div>
+                                    <div><b>Queue wait:</b> <span class="font-semibold text-amber-400">${plant.queue_length} vehicles</span></div>
+                                    <div><b>Processing cost:</b> ₹${plant.processing_cost_per_ton}/Ton</div>
+                                </div>
+                            `)
+                            .addTo(mapMarkersGroup.current);
+                    });
+
+                    // 2. Render Smart Transfer Stations
+                    const transferStations = [
+                        {"name": "Athipattu Transfer Station", "lat": 13.2010, "lng": 80.2280, "zone": "Zone 1"},
+                        {"name": "Mylapore Transfer Station", "lat": 13.0330, "lng": 80.2680, "zone": "Zone 9"},
+                        {"name": "Koyambedu Transfer Station", "lat": 13.0680, "lng": 80.2010, "zone": "Zone 10"},
+                        {"name": "Saidapet Transfer Station", "lat": 13.0210, "lng": 80.2230, "zone": "Zone 13"},
+                        {"name": "Pulianthope Transfer Station", "lat": 13.0980, "lng": 80.2590, "zone": "Zone 6"}
+                    ];
+                    transferStations.forEach(ts => {
+                        const tsIcon = L.divIcon({
+                            html: `<div class="w-7 h-7 rounded-lg bg-teal-600 border border-slate-900 flex items-center justify-center shadow-lg shadow-teal-500/20 hover:scale-110 transition-all">
+                                     <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z"></path><path d="M9 12h6M9 16h4"></path></svg>
+                                   </div>`,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [28, 28],
+                            iconAnchor: [14, 14]
+                        });
+                        L.marker([ts.lat, ts.lng], { icon: tsIcon })
+                            .bindPopup(`
+                                <div class="text-xs space-y-1 font-sans text-gray-200">
+                                    <h3 class="font-bold text-sm text-teal-400 border-b border-glassBorder pb-1 mb-1">${ts.name}</h3>
+                                    <div><b>Zone Location:</b> ${ts.zone}</div>
+                                    <div><b>Data Synced:</b> IoT Gateway Online</div>
+                                    <div><b>Protocol Interface:</b> ESP32 MQTT Node</div>
+                                </div>
+                            `)
+                            .addTo(mapMarkersGroup.current);
+                    });
+
+                    // 3. Render Trucks
+                    if (summary.trucks) {
+                        summary.trucks.forEach(truck => {
+                            if (truck.lat && truck.lng) {
+                                const isTransit = truck.route_status === 'TRANSIT';
+                                const truckMapIcon = L.divIcon({
+                                    html: `<div class="w-6 h-6 rounded-full ${isTransit ? 'bg-violet-600 shadow-violet-500/50' : 'bg-amber-500 shadow-amber-500/30'} border border-slate-900 flex items-center justify-center shadow hover:scale-110 transition-transform">
+                                             <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path><path d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h10zm0 0h4m-4 0h-4M17 16l4-4V9a1 1 0 00-1-1h-3v8z"></path></svg>
+                                           </div>`,
+                                    className: 'custom-leaflet-icon',
+                                    iconSize: [24, 24],
+                                    iconAnchor: [12, 12]
+                                });
+                                L.marker([truck.lat, truck.lng], { icon: truckMapIcon })
+                                    .bindPopup(`
+                                        <div class="text-xs space-y-1 font-sans text-gray-200">
+                                            <h3 class="font-bold text-sm text-amber-400 border-b border-glassBorder pb-1 mb-1">${truck.registration_number}</h3>
+                                            <div><b>Operational Status:</b> <span class="font-bold ${isTransit ? 'text-violet-400' : 'text-amber-400'}">${truck.route_status}</span></div>
+                                            <div><b>Current Payload:</b> ${truck.current_load.toFixed(1)} Tons / ${truck.capacity_tons} Tons</div>
+                                            <div><b>Assigned Destination:</b> ${truck.assigned_plant_id ? `Plant ID #${truck.assigned_plant_id}` : 'None (Available)'}</div>
+                                        </div>
+                                    `)
+                                    .addTo(mapMarkersGroup.current);
+                            }
+                        });
+                    }
+
+                    // 4. Render Active (Unallocated) Batches
+                    unallocated.forEach(batch => {
+                        const batchIcon = L.divIcon({
+                            html: `<div class="w-6 h-6 rounded-full bg-orange-600 border border-slate-900 flex items-center justify-center animate-pulse shadow-lg shadow-orange-600/30">
+                                     <div class="w-2.5 h-2.5 rounded-full bg-white"></div>
+                                   </div>`,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [24, 24],
+                            iconAnchor: [12, 12]
+                        });
+
+                        L.marker([batch.source_lat, batch.source_lng], { icon: batchIcon })
+                            .bindPopup(`
+                                <div class="text-xs space-y-1 font-sans text-gray-200">
+                                    <h3 class="font-bold text-sm text-orange-400 border-b border-glassBorder pb-1 mb-1">Batch #${batch.id}</h3>
+                                    <div><b>Source:</b> ${batch.transfer_station_name}</div>
+                                    <div><b>Moisture Content:</b> ${batch.moisture_percentage}%</div>
+                                    <div><b>Feedstock Weight:</b> ${batch.weight_tons} Tons</div>
+                                    <div><b>Value (AWVS):</b> ₹${batch.awvs_score ? Math.round(batch.awvs_score).toLocaleString() : 0}</div>
+                                </div>
+                            `)
+                            .addTo(mapMarkersGroup.current);
+                    });
+                }
+            }, [summary, unallocated]);
+
+            // Render Plant Capacity Chart
+            useEffect(() => {
+                if (summary && summary.plants && chartRef.current) {
+                    const ctx = chartRef.current.getContext('2d');
+                    
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+
+                    const labels = summary.plants.map(p => p.name.replace(" Waste-to-Energy", "").replace(" Plant", "").replace(" Facility", "").replace(" Micro Composting Center", ""));
+                    const capacities = summary.plants.map(p => p.capacity);
+                    const utilizations = summary.plants.map(p => p.utilization);
+
+                    chartInstance.current = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Utilized Capacity (Tons)',
+                                    data: utilizations,
+                                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                    borderColor: 'rgba(59, 130, 246, 1)',
+                                    borderWidth: 1.5,
+                                    borderRadius: 4
+                                },
+                                {
+                                    label: 'Available Headroom (Tons)',
+                                    data: capacities.map((cap, idx) => Math.max(0, cap - utilizations[idx])),
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                                    borderWidth: 1.5,
+                                    borderRadius: 4
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#9ca3af',
+                                        font: { family: 'Outfit', size: 10 }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    grid: { display: false },
+                                    ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 9 } }
+                                },
+                                y: {
+                                    stacked: true,
+                                    grid: { color: 'rgba(255, 255, 255, 0.03)' },
+                                    ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 9 } }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [summary]);
+
+            // Render AI Waste Forecasting Chart
+            useEffect(() => {
+                if (forecasts && forecastChartRef.current) {
+                    const ctx = forecastChartRef.current.getContext('2d');
+                    
+                    if (forecastChartInstance.current) {
+                        forecastChartInstance.current.destroy();
+                    }
+
+                    const zoneData = forecasts[activeForecastingZone] || [];
+                    const labels = zoneData.map(d => d.day);
+                    const tonnages = zoneData.map(d => d.predicted_tons);
+
+                    forecastChartInstance.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Forecasted Generation (Tons)',
+                                data: tonnages,
+                                fill: true,
+                                backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                                borderColor: '#8b5cf6',
+                                tension: 0.35,
+                                borderWidth: 2.5,
+                                pointBackgroundColor: '#8b5cf6',
+                                pointBorderColor: '#fff',
+                                pointHoverRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { display: false },
+                                    ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 10 } }
+                                },
+                                y: {
+                                    grid: { color: 'rgba(255, 255, 255, 0.03)' },
+                                    ticks: { color: '#9ca3af', font: { family: 'Outfit', size: 10 } }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [forecasts, activeForecastingZone]);
+
+            // Animate Truck Movement along OSRM road coordinates
+            const animateTruck = (startLatLng, endLatLng, batchId, plantName, routeGeometry) => {
+                if (!animatedTrucksGroup.current) return;
+
+                const hasRoute = routeGeometry && routeGeometry.length > 0;
+                const routeLine = L.polyline(hasRoute ? routeGeometry : [startLatLng, endLatLng], {
+                    color: '#8b5cf6',
+                    weight: 3,
+                    opacity: 0.8,
+                    dashArray: '5, 8'
+                }).addTo(animatedTrucksGroup.current);
+
+                const truckIcon = L.divIcon({
+                    html: `<div class="w-8 h-8 rounded-full bg-violet-600 border-2 border-slate-900 flex items-center justify-center shadow-lg shadow-violet-500/40">
+                             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path><path d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h10zm0 0h4m-4 0h-4M17 16l4-4V9a1 1 0 00-1-1h-3v8z"></path></svg>
+                           </div>`,
+                    className: 'custom-leaflet-icon',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+
+                const truckMarker = L.marker(startLatLng, { icon: truckIcon }).addTo(animatedTrucksGroup.current);
+
+                let start_time = null;
+                const duration = 2500;
+
+                const step = (timestamp) => {
+                    if (!start_time) start_time = timestamp;
+                    const progress = timestamp - start_time;
+                    const t = Math.min(progress / duration, 1.0);
+
+                    let lat, lng;
+                    if (hasRoute) {
+                        const totalSegments = routeGeometry.length - 1;
+                        const segment = Math.floor(t * totalSegments);
+                        const segmentT = (t * totalSegments) - segment;
+                        if (segment >= totalSegments) {
+                            [lat, lng] = routeGeometry[routeGeometry.length - 1];
+                        } else {
+                            const p1 = routeGeometry[segment];
+                            const p2 = routeGeometry[segment + 1];
+                            lat = p1[0] + (p2[0] - p1[0]) * segmentT;
+                            lng = p1[1] + (p2[1] - p1[1]) * segmentT;
+                        }
+                    } else {
+                        lat = startLatLng[0] + (endLatLng[0] - startLatLng[0]) * t;
+                        lng = startLatLng[1] + (endLatLng[1] - startLatLng[1]) * t;
+                    }
+
+                    truckMarker.setLatLng([lat, lng]);
+
+                    if (t < 1.0) {
+                        requestAnimationFrame(step);
+                    } else {
+                        truckMarker.bindPopup(`
+                            <div class="text-xs font-sans text-center font-semibold text-emerald-400">
+                                Allocated delivery arrived!<br/>
+                                <span class="text-gray-400">Batch #${batchId} -> ${plantName}</span>
+                            </div>
+                        `).openPopup();
+                        
+                        setTimeout(() => {
+                            if (animatedTrucksGroup.current) {
+                                animatedTrucksGroup.current.removeLayer(routeLine);
+                                animatedTrucksGroup.current.removeLayer(truckMarker);
+                            }
+                        }, 5000);
+                    }
+                };
+
+                requestAnimationFrame(step);
+            };
+
+            const handleSimulateAndOptimize = async () => {
+                setSimulating(true);
+                setSelectedBatchDetails(null);
+                if (animatedTrucksGroup.current) {
+                    animatedTrucksGroup.current.clearLayers();
+                }
+
+                try {
+                    const res = await fetch('/api/workflow', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            num_batches: numBatchesToSimulate,
+                            solver_mode: solverMode
+                        })
+                    }).then(r => r.json());
+
+                    if (res.status === "SUCCESS") {
+                        setLastRunDetails(res);
+                        
+                        res.optimization?.allocations.forEach(alloc => {
+                            const batch = res.simulated_batches.find(b => b.id === alloc.batch_id);
+                            if (batch && alloc.assigned_plant_id !== null) {
+                                let plantCoords = [13.04, 80.22];
+                                if (alloc.assigned_plant_name.includes("Kodungaiyur")) plantCoords = [13.1420, 80.2680];
+                                else if (alloc.assigned_plant_name.includes("Perungudi")) plantCoords = [12.9350, 80.2310];
+                                else if (alloc.assigned_plant_name.includes("Bio-CNG")) plantCoords = [13.0690, 80.1915];
+                                else if (alloc.assigned_plant_name.includes("Chetpet")) plantCoords = [13.0685, 80.2345];
+                                else if (alloc.assigned_plant_name.includes("Otteri")) plantCoords = [13.0940, 80.2520];
+                                else if (alloc.assigned_plant_name.includes("Ambattur")) plantCoords = [13.0990, 80.1620];
+                                else if (alloc.assigned_plant_name.includes("Gasification")) plantCoords = [13.0720, 80.1890];
+
+                                animateTruck(
+                                    [batch.source_lat, batch.source_lng],
+                                    plantCoords,
+                                    alloc.batch_id,
+                                    alloc.assigned_plant_name,
+                                    alloc.route_geometry
+                                );
+                            }
+                        });
+
+                        fetchData();
+                    } else {
+                        alert("Optimization failed: " + res.message);
+                    }
+                } catch (err) {
+                    console.error("Error executing workflow:", err);
+                    alert("Communication error with optimizer.");
+                } finally {
+                    setSimulating(false);
+                }
+            };
+
+            const getAwvsColor = (awvs) => {
+                if (awvs >= 60000) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                if (awvs >= 30000) return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+            };
+
+            const getBatchHubMetrics = (batch) => {
+                if (!batch) return null;
+                const org = batch.organic_percentage;
+                const rec = batch.recyclable_percentage;
+                const haz = batch.hazardous_percentage;
+                const mst = batch.moisture_percentage;
+                const w = batch.weight_tons;
+                
+                const lhv = Math.round(org * 24.0 + rec * 48.0 + haz * 14.0) * (1 - mst / 100.0) - (6 * mst);
+                
+                const dryOrg = (org / 100.0 * w) * (1 - mst / 100.0);
+                const compost = dryOrg * 0.32;
+                const dryRec = (rec / 100.0 * w) * (1 - mst / 100.0);
+                const rdf = (dryRec + dryOrg * 0.4) * 0.65;
+                const methane = dryOrg * 210.0;
+                const biogasElec = methane * 9.97 * 0.38;
+                const thermalElec = (w * 1000.0 * Math.max(700.0, lhv)) * 0.001163 * 0.24;
+                
+                let biometh = (org * 0.5) + (mst * 0.4) + (Math.max(0, 100 - haz * 20) * 0.1);
+                if (haz >= 4.0) biometh *= 0.15;
+                
+                const mstDev = Math.abs(mst - 50.0);
+                const mstFact = Math.max(0, 100 - mstDev * 3.5);
+                let compostSuit = (org * 0.5) + (mstFact * 0.4) + (Math.max(0, 100 - haz * 20) * 0.1);
+                if (haz >= 4.0) compostSuit *= 0.1;
+                
+                const rdfSuit = (rec * 0.6) + (Math.max(0, 100 - mst) * 0.3) + (Math.max(0, 100 - haz * 10) * 0.1);
+                const totalCombust = org + rec;
+                const gasSuit = (totalCombust * 0.4) + (Math.max(0, 100 - mst * 2) * 0.5) + (Math.max(0, 100 - haz * 10) * 0.1);
+                
+                const scores = {
+                    "Biomethanation": Math.max(0, biometh),
+                    "Composting": Math.max(0, compostSuit),
+                    "RDF": Math.max(0, rdfSuit),
+                    "Gasification": Math.max(0, gasSuit)
+                };
+                
+                let recTech = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+                if (haz > 12.0) recTech = "Landfill";
+                
+                return {
+                    lhv: Math.round(Math.max(700.0, lhv)),
+                    compost,
+                    rdf,
+                    methane,
+                    biogasElec,
+                    thermalElec,
+                    scores,
+                    recTech
+                };
+            };
+
+            const getTechBadge = (tech) => {
+                switch(tech) {
+                    case 'Biomethanation': return 'text-teal-400 bg-teal-500/10 border-teal-500/20';
+                    case 'Gasification': return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+                    case 'RDF': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+                    case 'Recycling': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                    case 'Waste-to-Energy': return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+                    default: return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                }
+            };
+
+            if (loading && !summary) {
+                return (
+                    <div class="flex flex-col items-center justify-center min-h-screen space-y-4">
+                        <div class="animate-spin rounded-full h-10 w-10 border-2 border-accentPurple border-t-transparent"></div>
+                        <p class="text-sm text-gray-400 font-sans tracking-wide">Syncing Chennai IoT and database modules...</p>
+                    </div>
+                );
+            }
+
+            const metrics = selectedBatchDetails ? getBatchHubMetrics(selectedBatchDetails) : null;
+
+            return (
+                <div class="min-h-screen flex flex-col font-sans text-gray-200">
+                    {/* Top Status Bar */}
+                    <div class="bg-[#050505] border-b border-glassBorder py-2.5 px-6 flex flex-col sm:flex-row justify-between items-center text-xs text-gray-400 gap-2">
+                        <div class="flex items-center gap-6">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span class="text-gray-300 font-medium">IoT Gateways: Connected (MQTT)</span>
+                            </div>
+                            <div>Database: <span class="text-gray-200">SQLite (waste_platform.db)</span></div>
+                            <div>Telemetry Nodes: <span class="text-gray-200">12 Active TN Trucks</span></div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div>Backend Optimizer: <span class="text-accentPurple font-semibold">CNN Classifier + Classical MILP</span></div>
+                            <div>Deployment Scope: <span class="text-gray-200 font-medium">Greater Chennai Corp (GCC)</span></div>
+                        </div>
+                    </div>
+
+                    {/* Main Header */}
+                    <header class="info-panel px-8 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-t-0 bg-[#09090b]">
+                        <div>
+                            <div class="flex items-center gap-2.5">
+                                <Icon name="zap" className="w-6 h-6 text-emerald-400 animate-pulse" />
+                                <h1 class="text-xl font-bold tracking-tight text-white uppercase">SmartWasteAI - AI & CNN-Driven Waste Logistics</h1>
+                            </div>
+                            <p class="text-xs text-zinc-400 mt-0.5">Chennai Deployment Case Study: Optimization of vehicle routing, capacity balancing, and WtE plant allocation</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="flex items-center bg-black border border-zinc-800 rounded-lg p-1">
+                                <span class="text-[11px] text-zinc-400 px-2.5 font-medium">Solver Mode:</span>
+                                <select 
+                                    value={solverMode}
+                                    onChange={(e) => setSolverMode(e.target.value)}
+                                    class="bg-zinc-900 border border-zinc-800 text-xs text-white rounded px-2.5 py-1 focus:ring-0 outline-none cursor-pointer"
+                                >
+                                    <option value="cnn_milp">CNN Classifier + MILP</option>
+                                    <option value="milp">Classical MILP Optimizer</option>
+                                    <option value="hybrid">Comparison Mode</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center bg-black border border-zinc-800 rounded-lg p-1">
+                                <span class="text-[11px] text-zinc-400 px-2.5 font-medium">Simulate:</span>
+                                <select 
+                                    value={numBatchesToSimulate}
+                                    onChange={(e) => setNumBatchesToSimulate(parseInt(e.target.value))}
+                                    class="bg-zinc-900 border border-zinc-800 text-xs text-white rounded px-2.5 py-1 focus:ring-0 outline-none cursor-pointer"
+                                >
+                                    <option value="1">1 TS Feed</option>
+                                    <option value="3">3 TS Feeds</option>
+                                    <option value="5">5 TS Feeds</option>
+                                </select>
+                            </div>
+                            <button 
+                                onClick={handleSimulateAndOptimize}
+                                disabled={simulating}
+                                class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs uppercase tracking-wider px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-lg shadow-emerald-950/50 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                            >
+                                {simulating ? (
+                                    <>
+                                        <div class="animate-spin rounded-full h-3 w-3 border border-white border-t-transparent"></div>
+                                        Solving QUBO Matrix...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Icon name="play" className="w-3.5 h-3.5" />
+                                        Simulate IoT Feed
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Operational KPI Grid */}
+                    <div class="px-8 pt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div class="info-panel p-4 rounded-xl border border-zinc-800/80 bg-[#09090b]">
+                            <p class="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Total Collection Runs</p>
+                            <div class="flex items-baseline gap-1 mt-1">
+                                <span class="text-xl font-bold text-white">{summary?.total_batches_collected || 0}</span>
+                                <span class="text-[10px] text-zinc-500 font-medium">runs</span>
+                            </div>
+                        </div>
+                        <div class="info-panel p-4 rounded-xl border border-zinc-800/80 bg-[#09090b]">
+                            <p class="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Feedstock Weight</p>
+                            <div class="flex items-baseline gap-1 mt-1">
+                                <span class="text-xl font-bold text-white">{summary?.total_waste_weight_tons?.toFixed(1) || 0}</span>
+                                <span class="text-[10px] text-zinc-500 font-medium">Tons</span>
+                            </div>
+                        </div>
+                        <div class="info-panel p-4 rounded-xl border border-zinc-800/80 bg-[#09090b]">
+                            <p class="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Average AWVS Value</p>
+                            <div class="flex items-baseline gap-1 mt-1">
+                                <span class="text-xl font-bold text-emerald-400">₹{summary?.average_awvs ? Math.round(summary.average_awvs).toLocaleString() : 0}</span>
+                                <span class="text-[10px] text-emerald-600 font-medium">INR</span>
+                            </div>
+                        </div>
+                        <div class="info-panel p-4 rounded-xl border border-zinc-800/80 bg-[#09090b]">
+                            <p class="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">WtE Electricity Yield</p>
+                            <div class="flex items-baseline gap-1 mt-1">
+                                <span class="text-xl font-bold text-white">{summary?.total_energy_recovered_kwh ? (summary.total_energy_recovered_kwh / 1000).toFixed(2) : 0}</span>
+                                <span class="text-[10px] text-zinc-500 font-medium">MWh</span>
+                            </div>
+                        </div>
+                        <div class="info-panel p-4 rounded-xl border border-zinc-800/80 bg-[#09090b]">
+                            <p class="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Total Transit Distance</p>
+                            <div class="flex items-baseline gap-1 mt-1">
+                                <span class="text-xl font-bold text-white">{summary?.total_transit_distance_km ? summary.total_transit_distance_km.toFixed(1) : 0}</span>
+                                <span class="text-[10px] text-zinc-500 font-medium">km</span>
+                            </div>
+                        </div>
+                        <div class="info-panel p-4 rounded-xl border border-emerald-500/40 bg-[#09090b]">
+                            <p class="text-[10px] text-emerald-400 uppercase tracking-wider font-bold">Carbon Offsets</p>
+                            <div class="flex items-baseline gap-1 mt-1">
+                                <span class="text-xl font-bold text-emerald-400">{summary?.total_co2_offset_kg ? (summary.total_co2_offset_kg / 1000).toFixed(2) : 0}</span>
+                                <span class="text-[10px] text-emerald-500 font-medium">t CO₂e</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content Layout */}
+                    <div class="p-8 grid grid-cols-1 xl:grid-cols-3 gap-6 flex-1">
+                        
+                        {/* LEFT AND CENTRAL COLUMN (2/3 width) */}
+                        <div class="xl:col-span-2 space-y-6">
+                            
+                            {/* Live GIS Map Panel */}
+                            <div class="info-panel p-5 rounded-2xl flex flex-col h-[460px] bg-[#09090b] border border-zinc-800">
+                                <h2 class="text-sm font-bold uppercase tracking-wider mb-3 text-white flex items-center gap-2">
+                                    <Icon name="navigation" className="w-4 h-4 text-emerald-400 animate-pulse" />
+                                    Smart City GIS Digital Twin Map (Chennai Case Study)
+                                </h2>
+                                <div 
+                                    ref={mapContainerRef} 
+                                    className="flex-1 rounded-xl border border-zinc-800 overflow-hidden"
+                                    style={{ height: '370px', width: '100%' }}
+                                ></div>
+                            </div>
+
+                            {/* Active Fleet / Telemetry / Alerts tabs */}
+                            <div class="info-panel p-5 rounded-2xl bg-[#09090b] border border-zinc-800">
+                                <div class="flex border-b border-zinc-800 mb-4 justify-between items-center">
+                                    <div class="flex gap-4">
+                                        <button 
+                                            onClick={() => setActiveTab('batches')}
+                                            class={`pb-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'batches' ? 'border-b-emerald-400 text-white' : 'border-b-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            Unallocated Batches ({unallocated.length})
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveTab('trucks')}
+                                            class={`pb-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'trucks' ? 'border-b-amber-400 text-white' : 'border-b-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            Simulated Fleet ({summary?.trucks?.length || 0})
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveTab('circular')}
+                                            class={`pb-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'circular' ? 'border-b-teal-400 text-white' : 'border-b-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            Circular Economy Metrics
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveTab('transit')}
+                                            class={`pb-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'transit' ? 'border-b-purple-400 text-white' : 'border-b-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            Transit Centers Edge (Live)
+                                        </button>
+                                    </div>
+                                    <span class="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold hidden md:inline">
+                                        IoT Gateway Telemetry
+                                    </span>
+                                </div>
+
+                                {activeTab === 'batches' && (
+                                    <div class="overflow-x-auto custom-scrollbar max-h-56">
+                                        {unallocated.length === 0 ? (
+                                            <div class="text-center text-gray-500 py-12 text-xs">
+                                                No active unallocated waste batches in queue.
+                                            </div>
+                                        ) : (
+                                            <table class="w-full text-left text-xs border-collapse">
+                                                <thead>
+                                                    <tr class="border-b border-glassBorder text-gray-400 uppercase font-semibold">
+                                                        <th class="py-2.5 px-3">Batch ID</th>
+                                                        <th class="py-2.5 px-3">Transfer Station</th>
+                                                        <th class="py-2.5 px-3">Weight</th>
+                                                        <th class="py-2.5 px-3">Moisture</th>
+                                                        <th class="py-2.5 px-3 font-semibold text-teal-400">Org %</th>
+                                                        <th class="py-2.5 px-3 font-semibold text-blue-400">Rec %</th>
+                                                        <th class="py-2.5 px-3 font-semibold text-rose-400">Haz %</th>
+                                                        <th class="py-2.5 px-3">AWVS (INR)</th>
+                                                        <th class="py-2.5 px-3 text-right">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {unallocated.map((batch) => (
+                                                        <tr key={batch.id} class="border-b border-glassBorder/40 hover:bg-white/5 transition-colors">
+                                                            <td class="py-2.5 px-3 font-semibold text-gray-300">#{batch.id}</td>
+                                                            <td class="py-2.5 px-3">{batch.transfer_station_name}</td>
+                                                            <td class="py-2.5 px-3">{batch.weight_tons} Tons</td>
+                                                            <td class="py-2.5 px-3">{batch.moisture_percentage}%</td>
+                                                            <td class="py-2.5 px-3 text-teal-400">{batch.organic_percentage.toFixed(0)}%</td>
+                                                            <td class="py-2.5 px-3 text-blue-400">{batch.recyclable_percentage.toFixed(0)}%</td>
+                                                            <td class="py-2.5 px-3 text-rose-400">{batch.hazardous_percentage.toFixed(1)}%</td>
+                                                            <td class="py-2.5 px-3">
+                                                                <span class={`px-2 py-0.5 rounded border text-[10px] font-bold ${getAwvsColor(batch.awvs_score)}`}>
+                                                                    ₹{batch.awvs_score ? Math.round(batch.awvs_score).toLocaleString() : 0}
+                                                                </span>
+                                                            </td>
+                                                            <td class="py-2.5 px-3 text-right">
+                                                                <button 
+                                                                    onClick={() => setSelectedBatchDetails(batch)}
+                                                                    class="text-[10px] uppercase font-bold text-accentBlue hover:underline"
+                                                                >
+                                                                    Analyze
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeTab === 'trucks' && (
+                                    <div class="overflow-x-auto custom-scrollbar max-h-56">
+                                        <table class="w-full text-left text-xs border-collapse">
+                                            <thead>
+                                                <tr class="border-b border-glassBorder text-gray-400 uppercase font-semibold">
+                                                    <th class="py-2.5 px-3">Truck Reg #</th>
+                                                    <th class="py-2.5 px-3">Max Payload</th>
+                                                    <th class="py-2.5 px-3">Current Load</th>
+                                                    <th class="py-2.5 px-3">Status</th>
+                                                    <th class="py-2.5 px-3">Position</th>
+                                                    <th class="py-2.5 px-3 text-right">GPS Coordinate</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {summary?.trucks.map((truck) => (
+                                                    <tr key={truck.id} class="border-b border-glassBorder/40 hover:bg-white/5 transition-colors">
+                                                        <td class="py-2.5 px-3 font-semibold text-gray-300">{truck.registration_number}</td>
+                                                        <td class="py-2.5 px-3">{truck.capacity_tons} Tons</td>
+                                                        <td class="py-2.5 px-3 text-amber-400 font-bold">{truck.current_load.toFixed(1)} Tons</td>
+                                                        <td class="py-2.5 px-3">
+                                                            <span class={`px-2 py-0.5 rounded border text-[10px] font-bold ${truck.route_status === 'TRANSIT' ? 'text-violet-400 bg-violet-500/10 border-violet-500/20 animate-pulse' : 'text-gray-400 bg-gray-500/10 border-gray-500/20'}`}>
+                                                                {truck.route_status}
+                                                            </span>
+                                                        </td>
+                                                        <td class="py-2.5 px-3 text-gray-400">{truck.assigned_plant_id ? `En-route to Plant ID: ${truck.assigned_plant_id}` : 'Idle (Available)'}</td>
+                                                        <td class="py-2.5 px-3 text-right text-[10px] text-gray-500">{truck.lat ? `${truck.lat.toFixed(4)}, ${truck.lng.toFixed(4)}` : 'N/A'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {activeTab === 'circular' && summary?.circular_metrics && (
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 py-2">
+                                        <div class="bg-black/80 p-3 rounded-lg border border-zinc-800 text-center">
+                                            <p class="text-[9px] text-zinc-400 uppercase">Landfill Diversion Rate</p>
+                                            <p class="text-lg font-bold text-emerald-400 mt-1">{summary.circular_metrics.landfill_diversion_rate}%</p>
+                                            <p class="text-[8px] text-zinc-500 mt-0.5">Diverted away from dumpyards</p>
+                                        </div>
+                                        <div class="bg-black/80 p-3 rounded-lg border border-zinc-800 text-center">
+                                            <p class="text-[9px] text-zinc-400 uppercase">Recyclability Index</p>
+                                            <p class="text-lg font-bold text-sky-400 mt-1">{summary.circular_metrics.recyclability_index}%</p>
+                                            <p class="text-[8px] text-zinc-500 mt-0.5">Recovered material weight</p>
+                                        </div>
+                                        <div class="bg-black/80 p-3 rounded-lg border border-zinc-800 text-center">
+                                            <p class="text-[9px] text-zinc-400 uppercase">Organic Recovery Rate</p>
+                                            <p class="text-lg font-bold text-teal-400 mt-1">{summary.circular_metrics.organic_recovery_rate}%</p>
+                                            <p class="text-[8px] text-zinc-500 mt-0.5">Compost & Biogas output</p>
+                                        </div>
+                                        <div class="bg-black/80 p-3 rounded-lg border border-zinc-800 text-center">
+                                            <p class="text-[9px] text-zinc-400 uppercase">Carbon Credits Earned</p>
+                                            <p class="text-lg font-bold text-purple-400 mt-1">${summary.circular_metrics.carbon_credits_earned} USD</p>
+                                            <p class="text-[8px] text-zinc-500 mt-0.5">Valued at $15/ton CO2e</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'transit' && (
+                                    <div class="space-y-6">
+                                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-glassBorder/40 pb-4 gap-3">
+                                            <div>
+                                                <h3 class="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                                                    <Icon name="activity" className="w-4 h-4 text-accentPurple" />
+                                                    Edge Conveyor Segregation Module
+                                                </h3>
+                                                <p class="text-[10px] text-gray-400">Live 1-second telemetry of Computer Vision sorting and sensor verification</p>
+                                            </div>
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex items-center bg-gray-950 border border-glassBorder rounded-lg p-1">
+                                                    <span class="text-[10px] text-gray-400 px-2.5">Transit Station:</span>
+                                                    <select 
+                                                        value={activeTransitStation}
+                                                        onChange={(e) => {
+                                                            setActiveTransitStation(e.target.value);
+                                                            setTransitConveyorLogs([]);
+                                                        }}
+                                                        class="bg-gray-900 border-none text-xs text-white rounded px-2.5 py-1 focus:ring-0 outline-none"
+                                                    >
+                                                        <option value="Athipattu Transfer Station">Athipattu TS (Zone 1)</option>
+                                                        <option value="Mylapore Transfer Station">Mylapore TS (Zone 9)</option>
+                                                        <option value="Koyambedu Transfer Station">Koyambedu TS (Zone 10)</option>
+                                                        <option value="Saidapet Transfer Station">Saidapet TS (Zone 13)</option>
+                                                        <option value="Pulianthope Transfer Station">Pulianthope TS (Zone 6)</option>
+                                                    </select>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setTransitLiveMode(!transitLiveMode)}
+                                                    class={`text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all ${transitLiveMode ? 'bg-red-500/10 border border-red-500/30 text-red-400' : 'bg-green-500/10 border border-green-500/30 text-green-400'}`}
+                                                >
+                                                    <span class={`w-2 h-2 rounded-full ${transitLiveMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
+                                                    {transitLiveMode ? "Pause Stream" : "Resume Stream"}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Physical Conveyor Belt Container */}
+                                        <div class="bg-gray-950/60 border border-glassBorder rounded-2xl p-5 relative overflow-hidden flex flex-col items-center">
+                                            {/* Camera module graphic overlay */}
+                                            <div class="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
+                                                <div class="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center shadow-lg">
+                                                    <Icon name="cpu" className="w-4 h-4 text-accentPurple" />
+                                                </div>
+                                                <div class="w-0.5 h-6 bg-accentPurple/45"></div>
+                                                <div class="text-[8px] bg-accentPurple/20 text-accentPurple px-1.5 py-0.5 rounded border border-accentPurple/30 tracking-widest uppercase font-bold">
+                                                    YOLOv8 CV Scanner
+                                                </div>
+                                            </div>
+
+                                            {/* Physical Conveyor frame */}
+                                            <div class="w-full h-32 bg-gray-900 border-y-2 border-slate-700 relative rounded-lg mt-12 flex items-center overflow-hidden">
+                                                {/* Rolling conveyor belt background pattern */}
+                                                <div class="absolute inset-0 opacity-10 bg-repeat-x conveyor-belt-scroll pointer-events-none" style={{ backgroundImage: 'linear-gradient(90deg, #fff 50%, transparent 50%)', backgroundSize: '40px 100%' }}></div>
+                                                
+                                                {/* Scanned conveyor items */}
+                                                {transitTelemetry && (
+                                                    <div class="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 transition-all duration-300">
+                                                        {/* Object Visual Card */}
+                                                        <div class={`px-4 py-2 rounded-xl border-2 flex flex-col items-center justify-center shadow-lg font-bold text-xs text-white ${
+                                                            transitTelemetry.category === 'Organic' ? 'bg-teal-950/70 border-teal-500 shadow-teal-500/10' :
+                                                            transitTelemetry.category === 'Recyclable' ? 'bg-blue-950/70 border-blue-500 shadow-blue-500/10' :
+                                                            transitTelemetry.category === 'Hazardous' ? 'bg-rose-950/70 border-rose-500 shadow-rose-500/10' :
+                                                            'bg-slate-950/70 border-slate-500 shadow-slate-500/10'
+                                                        }`}>
+                                                            <span class="text-[8px] uppercase tracking-wider text-gray-400 font-semibold">{transitTelemetry.category}</span>
+                                                            <span class="mt-0.5 text-center font-bold">{transitTelemetry.object_name}</span>
+                                                            <span class="text-[7.5px] text-gray-500 font-normal mt-0.5">YOLO Conf: ${(transitTelemetry.confidence * 100).toFixed(1)}%</span>
+                                                        </div>
+                                                        
+                                                        {/* Object Bounding Box indicator */}
+                                                        <div class={`w-36 h-20 -mt-[62px] border-2 border-dashed rounded-2xl flex items-center justify-center pointer-events-none ${
+                                                            transitTelemetry.category === 'Organic' ? 'border-teal-400 animate-pulse' :
+                                                            transitTelemetry.category === 'Recyclable' ? 'border-blue-400 animate-pulse' :
+                                                            transitTelemetry.category === 'Hazardous' ? 'border-rose-400 animate-pulse' :
+                                                            'border-slate-400 animate-pulse'
+                                                        }`}></div>
+                                                    </div>
+                                                )}
+
+                                                <div class="absolute left-3 text-[9px] text-gray-500 uppercase tracking-widest font-semibold bg-gray-950 px-2 py-0.5 rounded border border-glassBorder">Entrance</div>
+                                                <div class="absolute right-3 text-[9px] text-gray-500 uppercase tracking-widest font-semibold bg-gray-950 px-2 py-0.5 rounded border border-glassBorder">Actuators</div>
+                                            </div>
+
+                                            {/* Sorting Actuators statuses */}
+                                            <div class="grid grid-cols-2 md:grid-cols-5 gap-2 w-full mt-6 text-center text-[8.5px] font-bold text-gray-400 uppercase">
+                                                <div class={`p-2 rounded-lg border transition-all duration-300 ${transitTelemetry?.actuator.includes("Gate A") ? 'bg-teal-500/20 border-teal-500 text-teal-400 shadow shadow-teal-500/10' : 'bg-gray-900 border-glassBorder'}`}>
+                                                    Gate A (CNG Route)
+                                                </div>
+                                                <div class={`p-2 rounded-lg border transition-all duration-300 ${transitTelemetry?.actuator.includes("Gate B") ? 'bg-teal-500/20 border-teal-500 text-teal-400 shadow shadow-teal-500/10' : 'bg-gray-900 border-glassBorder'}`}>
+                                                    Gate B (Compost Route)
+                                                </div>
+                                                <div class={`p-2 rounded-lg border transition-all duration-300 ${transitTelemetry?.actuator.includes("Air Jet") ? 'bg-blue-500/20 border-blue-500 text-blue-400 shadow shadow-blue-500/10' : 'bg-gray-900 border-glassBorder'}`}>
+                                                    Pneumatic Air Blast
+                                                </div>
+                                                <div class={`p-2 rounded-lg border transition-all duration-300 ${transitTelemetry?.actuator.includes("Sorting Arm") ? 'bg-rose-500/20 border-rose-500 text-rose-400 shadow shadow-rose-500/10' : 'bg-gray-900 border-glassBorder'}`}>
+                                                    Robotic Sorting Arm
+                                                </div>
+                                                <div class={`p-2 rounded-lg border transition-all duration-300 ${transitTelemetry?.actuator.includes("Linear Diverter") ? 'bg-slate-500/20 border-slate-500 text-slate-400 shadow shadow-slate-500/10' : 'bg-gray-900 border-glassBorder'}`}>
+                                                    Linear Diverter Arm
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Telemetry Dials & Counters */}
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Sensor telemetries */}
+                                            <div class="info-panel p-5 rounded-2xl flex flex-col justify-between">
+                                                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-300 mb-3">Conveyor Telemetry & Sensor Output</h4>
+                                                {transitTelemetry ? (
+                                                    <div class="grid grid-cols-2 gap-3 text-[10px] text-gray-400">
+                                                        <div class="p-2.5 bg-[#0b0f19] rounded-lg border border-glassBorder">
+                                                            <span class="text-[8px] text-gray-500 uppercase">Capacitive Moisture Sensor</span>
+                                                            <div class="text-xs font-bold text-white mt-0.5">{transitTelemetry.moisture_pct}% ({transitTelemetry.moisture_voltage} V)</div>
+                                                        </div>
+                                                        <div class="p-2.5 bg-[#0b0f19] rounded-lg border border-glassBorder">
+                                                            <span class="text-[8px] text-gray-500 uppercase">Load Cell Weight Reading</span>
+                                                            <div class="text-xs font-bold text-white mt-0.5">{(transitTelemetry.weight_kg * 1000).toFixed(0)} grams</div>
+                                                        </div>
+                                                        <div class="p-2.5 bg-[#0b0f19] rounded-lg border border-glassBorder">
+                                                            <span class="text-[8px] text-gray-500 uppercase">Active Sorting Command</span>
+                                                            <div class="text-xs font-bold text-accentPurple mt-0.5">{transitTelemetry.actuator}</div>
+                                                        </div>
+                                                        <div class="p-2.5 bg-[#0b0f19] rounded-lg border border-glassBorder">
+                                                            <span class="text-[8px] text-gray-500 uppercase">Segregated Route Target</span>
+                                                            <div class="text-xs font-bold text-white mt-0.5">{transitTelemetry.destination}</div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p class="text-xs text-gray-500 italic">Awaiting telemetry logs...</p>
+                                                )}
+                                                <p class="text-[9px] text-gray-500 italic mt-3">
+                                                    Moisture voltage conversion uses linear interpolation against ESP32 capacitive calibration points. YOLOv8 CV outputs boundaries to GPIO actuators.
+                                                </p>
+                                            </div>
+
+                                            {/* Cumulative sorted stats */}
+                                            <div class="info-panel p-5 rounded-2xl">
+                                                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-300 mb-3">Conveyor Cumulative Segregation Tally</h4>
+                                                {transitTelemetry?.tally ? (
+                                                    <div class="grid grid-cols-2 gap-2 text-center text-[10px] font-bold text-gray-400">
+                                                        <div class="p-2.5 bg-gray-950/50 rounded-lg border border-glassBorder/60">
+                                                            <div class="text-[8px] text-teal-400 uppercase">Organic Sorted</div>
+                                                            <div class="text-xs font-bold text-white mt-0.5">{transitTelemetry.tally.organic_count} items</div>
+                                                            <div class="text-[8px] text-gray-500 mt-0.5">{transitTelemetry.tally.organic_tons.toFixed(4)} Tons</div>
+                                                        </div>
+                                                        <div class="p-2.5 bg-gray-950/50 rounded-lg border border-glassBorder/60">
+                                                            <div class="text-[8px] text-blue-400 uppercase">Recyclables Sorted</div>
+                                                            <div class="text-xs font-bold text-white mt-0.5">{transitTelemetry.tally.recyclable_count} items</div>
+                                                            <div class="text-[8px] text-gray-500 mt-0.5">{transitTelemetry.tally.recyclable_tons.toFixed(4)} Tons</div>
+                                                        </div>
+                                                        <div class="p-2.5 bg-gray-950/50 rounded-lg border border-glassBorder/60">
+                                                            <div class="text-[8px] text-rose-400 uppercase">Hazardous Sorted</div>
+                                                            <div class="text-xs font-bold text-white mt-0.5">{transitTelemetry.tally.hazardous_count} items</div>
+                                                            <div class="text-[8px] text-gray-500 mt-0.5">{transitTelemetry.tally.hazardous_tons.toFixed(4)} Tons</div>
+                                                        </div>
+                                                        <div class="p-2.5 bg-gray-950/50 rounded-lg border border-glassBorder/60">
+                                                            <div class="text-[8px] text-slate-400 uppercase">Inerts Sorted</div>
+                                                            <div class="text-xs font-bold text-white mt-0.5">{transitTelemetry.tally.inert_count} items</div>
+                                                            <div class="text-[8px] text-gray-500 mt-0.5">{transitTelemetry.tally.inert_tons.toFixed(4)} Tons</div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p class="text-xs text-gray-500 italic">No tally statistics computed yet.</p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Real-time conveyor logs */}
+                                        <div class="info-panel p-5 rounded-2xl">
+                                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-300 mb-3">Conveyor Event Logs (Real-time feed)</h4>
+                                            <div class="overflow-y-auto max-h-36 custom-scrollbar space-y-1.5 pr-2">
+                                                {transitConveyorLogs.length === 0 ? (
+                                                    <div class="text-center text-gray-500 py-6 text-xs italic">Awaiting conveyor sorting events...</div>
+                                                ) : (
+                                                    transitConveyorLogs.map((log, idx) => (
+                                                        <div key={idx} class="p-2 rounded bg-gray-950/40 border border-glassBorder/40 text-[9px] flex justify-between items-center text-gray-400">
+                                                            <div>
+                                                                <span class="text-gray-500 mr-2">[{log.timestamp}]</span>
+                                                                Labeled <span class="font-bold text-white">{log.object_name}</span> as <span class={`font-bold ${
+                                                                    log.category === 'Organic' ? 'text-teal-400' :
+                                                                    log.category === 'Recyclable' ? 'text-blue-400' :
+                                                                    log.category === 'Hazardous' ? 'text-rose-400' : 'text-slate-400'
+                                                                }`}>{log.category.toUpperCase()}</span> (YOLO Conf: ${(log.confidence * 100).toFixed(1)}%).
+                                                                Fired Actuator: <span class="font-semibold text-white">{log.actuator}</span>.
+                                                            </div>
+                                                            <span class="text-gray-500 font-medium">Routed to: {log.destination}</span>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* AI Forecasting & Sensor Specifications Panel */}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* AI Waste Forecasting Chart */}
+                                <div class="info-panel p-5 rounded-2xl">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <h2 class="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                                            <Icon name="bar-chart" className="w-4 h-4 text-accentPurple" />
+                                            AI Waste Generation Forecasting
+                                        </h2>
+                                        <select 
+                                            value={activeForecastingZone}
+                                            onChange={(e) => setActiveForecastingZone(e.target.value)}
+                                            class="bg-gray-950 text-gray-300 border border-glassBorder rounded text-[10px] px-2 py-0.5 outline-none"
+                                        >
+                                            <option value="Zone 1 (Kathivakkam)">Zone 1 (Kathivakkam)</option>
+                                            <option value="Zone 9 (Teynampet)">Zone 9 (Teynampet)</option>
+                                            <option value="Zone 10 (Kodambakkam)">Zone 10 (Kodambakkam)</option>
+                                            <option value="Zone 13 (Adyar)">Zone 13 (Adyar)</option>
+                                            <option value="Zone 6 (Thiru-Vi-Ka Nagar)">Zone 6 (Thiru-Vi-Ka Nagar)</option>
+                                        </select>
+                                    </div>
+                                    <div class="h-44 relative">
+                                        <canvas ref={forecastChartRef}></canvas>
+                                    </div>
+                                </div>
+
+                                {/* ESP32 IoT Node Physical Spec */}
+                                <div class="info-panel p-5 rounded-2xl flex flex-col justify-between">
+                                    <div>
+                                        <h2 class="text-xs font-bold uppercase tracking-wider text-gray-300 mb-3 flex items-center gap-2">
+                                            <Icon name="cpu" className="w-4 h-4 text-accentTeal" />
+                                            ESP32 IoT Node Hardware Interface
+                                        </h2>
+                                        <div class="grid grid-cols-2 gap-2 text-[10px] text-gray-400 bg-gray-950/40 p-3 rounded-lg border border-glassBorder">
+                                            <div><b>MCU Module:</b> ESP32-WROOM-32</div>
+                                            <div><b>Comms Protocols:</b> MQTT / LoRaWAN</div>
+                                            <div><b>Fill Level Sensor:</b> HC-SR04 Ultrasonic</div>
+                                            <div><b>Moisture Sensor:</b> Capacitive Soil v1.2</div>
+                                            <div><b>Weight Cell:</b> HX711 + 20T Load Cell</div>
+                                            <div><b>Power Unit:</b> 3.7V Li-ion + 5W Solar</div>
+                                        </div>
+                                    </div>
+                                    <p class="text-[9px] text-gray-500 italic mt-3">
+                                        Smart telemetry sensors read truck payloads and transfer station bin fill levels every second. Data is formatted as JSON payloads and transmitted via MQTT (1883) gateways.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN (1/3 width): Quantum & Analytics Diagnostics */}
+                        <div class="space-y-6">
+                            
+                            {/* Plant Utilization profile */}
+                            <div class="info-panel p-5 rounded-2xl">
+                                <h2 class="text-sm font-bold uppercase tracking-wider mb-4 text-gray-300 flex items-center gap-2">
+                                    <Icon name="bar-chart" className="w-4 h-4 text-accentBlue" />
+                                    Plant utilization profiles
+                                </h2>
+                                <div class="h-44 relative">
+                                    <canvas ref={chartRef}></canvas>
+                                </div>
+                            </div>
+
+                            {/* Intelligent Waste Resource Allocation Hub Diagnostics */}
+                            {selectedBatchDetails ? (
+                                <div class="info-panel p-5 rounded-2xl flex flex-col border-l-2 border-l-accentBlue max-h-[500px] overflow-y-auto custom-scrollbar">
+                                    <div class="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h3 class="text-xs font-bold text-white uppercase flex items-center gap-1">
+                                                <Icon name="cpu" className="w-3.5 h-3.5 text-accentBlue" />
+                                                Intelligent Hub Diagnostics
+                                            </h3>
+                                            <p class="text-[10px] text-gray-400">Batch #{selectedBatchDetails.id} Software Analytics</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => setSelectedBatchDetails(null)}
+                                            class="text-gray-400 hover:text-white"
+                                        >
+                                            <Icon name="check-circle" className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="space-y-4 text-[11px]">
+                                        {/* Module 1: IoT Sensor Values */}
+                                        <div class="space-y-1">
+                                            <div class="text-[9px] text-gray-400 uppercase">Live IoT Sensor Telemetry</div>
+                                            <div class="grid grid-cols-2 gap-2 text-[10px] bg-gray-950/60 p-2.5 rounded-lg border border-glassBorder">
+                                                <div><b>IoT Device ID:</b> {selectedBatchDetails.iot_device_id}</div>
+                                                <div><b>Protocol:</b> {selectedBatchDetails.iot_protocol}</div>
+                                                <div><b>Moisture ADC:</b> {selectedBatchDetails.moisture_raw_v} V</div>
+                                                <div><b>Load Cell Signal:</b> {selectedBatchDetails.load_cell_mv} mV</div>
+                                                <div><b>Ultrasonic Bin Fill:</b> {selectedBatchDetails.fill_level_pct}%</div>
+                                                <div><b>Update Rate:</b> Real-time (1s)</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Module 2: Waste Characterization & LHV */}
+                                        <div class="grid grid-cols-2 gap-2 bg-gray-950/40 p-2.5 rounded-xl border border-glassBorder">
+                                            <div>
+                                                <div class="text-[9px] text-gray-500 uppercase">Estimated LHV</div>
+                                                <div class="text-xs font-bold text-white mt-0.5">{metrics.lhv.toLocaleString()} kcal/kg</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-[9px] text-gray-500 uppercase">Moisture (Wet Basis)</div>
+                                                <div class="text-xs font-bold text-orange-400 mt-0.5">{selectedBatchDetails.moisture_percentage}%</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Module 3: Composition Analysis */}
+                                        <div class="space-y-1">
+                                            <div class="text-[9px] text-gray-400 uppercase">Composition Breakdown</div>
+                                            <div class="flex h-2.5 rounded overflow-hidden mt-1">
+                                                <div class="bg-teal-500" style={{ width: `${selectedBatchDetails.organic_percentage}%` }}></div>
+                                                <div class="bg-blue-500" style={{ width: `${selectedBatchDetails.recyclable_percentage}%` }}></div>
+                                                <div class="bg-rose-500" style={{ width: `${selectedBatchDetails.hazardous_percentage}%` }}></div>
+                                                <div class="bg-gray-600" style={{ width: `${Math.max(0, 100 - selectedBatchDetails.organic_percentage - selectedBatchDetails.recyclable_percentage - selectedBatchDetails.hazardous_percentage)}%` }}></div>
+                                            </div>
+                                            <div class="flex justify-between text-[9px] text-gray-500">
+                                                <span>Org ({selectedBatchDetails.organic_percentage.toFixed(0)}%)</span>
+                                                <span>Rec ({selectedBatchDetails.recyclable_percentage.toFixed(0)}%)</span>
+                                                <span>Haz ({selectedBatchDetails.hazardous_percentage.toFixed(1)}%)</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Module 4: Energy Output & Yield Predictions */}
+                                        <div class="space-y-1.5 p-2.5 bg-gray-950/40 rounded-xl border border-glassBorder">
+                                            <div class="text-[9px] text-gray-400 uppercase font-bold">Energy & Yield Predictions</div>
+                                            <div class="grid grid-cols-2 gap-2 text-[10px]">
+                                                <div><b>Est. Electricity:</b> {metrics.recTech === 'Biomethanation' ? Math.round(metrics.biogasElec).toLocaleString() : Math.round(metrics.thermalElec).toLocaleString()} kWh</div>
+                                                <div><b>Biogas Methane:</b> {Math.round(metrics.methane).toLocaleString()} m³</div>
+                                                <div><b>Compost Output:</b> {metrics.compost.toFixed(2)} Tons</div>
+                                                <div><b>RDF Potential:</b> {metrics.rdf.toFixed(2)} Tons</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Module 5: AWVS Calculation & Recommendations */}
+                                        <div class="p-2.5 bg-blue-950/20 border border-blue-500/10 rounded-xl space-y-1.5">
+                                            <div class="font-bold text-accentBlue uppercase text-[9px] tracking-wider">Dynamic AWVS Evaluation</div>
+                                            <div class="text-[10px] text-gray-300 leading-relaxed">
+                                                <b>Suitability:</b> Biomethanation ({metrics.scores.Biomethanation.toFixed(0)}%), RDF ({metrics.scores.RDF.toFixed(0)}%), Composting ({metrics.scores.Composting.toFixed(0)}%)
+                                                <div class="border-t border-glassBorder/40 pt-1.5 mt-1">
+                                                    <b>Recommendation:</b> Route to <b>{metrics.recTech.toUpperCase()}</b>. Intrinsic AWVS value is <b>₹{Math.round(selectedBatchDetails.awvs_score).toLocaleString()} INR</b>.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div class="info-panel p-5 rounded-2xl flex flex-col">
+                                    <h2 class="text-sm font-bold uppercase tracking-wider mb-3 text-gray-300 flex items-center gap-2">
+                                        <Icon name="cpu" className="w-4 h-4 text-accentPurple" />
+                                        CNN & AI Classical Optimizer Output
+                                    </h2>
+                                    <div class="flex-grow flex flex-col justify-between space-y-4">
+                                        {!lastRunDetails ? (
+                                            <div class="flex-grow flex flex-col items-center justify-center text-center text-gray-500 py-12 text-xs">
+                                                <Icon name="cpu" className="w-8 h-8 text-gray-600 mb-2 animate-pulse" />
+                                                <p>No active optimization data found. Run a simulation to trigger the SmartWasteAI solver.</p>
+                                            </div>
+                                        ) : (
+                                            <div class="text-xs space-y-4 flex-grow flex flex-col">
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div class="p-2.5 bg-gray-950/60 rounded-lg">
+                                                        <div class="text-[9px] text-gray-500 uppercase">Features Analyzed</div>
+                                                        <div class="text-sm font-bold text-accentPurple mt-0.5">
+                                                            {lastRunDetails.optimization?.allocations.length * 4} Features
+                                                        </div>
+                                                    </div>
+                                                    <div class="p-2.5 bg-gray-950/60 rounded-lg">
+                                                        <div class="text-[9px] text-gray-500 uppercase">Solver Duration</div>
+                                                        <div class="text-sm font-bold text-white mt-0.5">
+                                                            {lastRunDetails.optimization?.computation_time_ms} ms
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="flex-grow overflow-y-auto max-h-56 custom-scrollbar space-y-2">
+                                                    <div class="text-[10px] uppercase font-bold text-gray-400 mb-1">CNN & MILP Allocation Results:</div>
+                                                    {lastRunDetails.optimization?.allocations.map((alloc) => (
+                                                        <div key={alloc.batch_id} class="p-3 bg-[#0c101b] border border-glassBorder rounded-xl space-y-2">
+                                                            <div class="flex justify-between items-center border-b border-glassBorder pb-1.5">
+                                                                <span class="font-bold text-white text-[10px]">{alloc.assigned_plant_name}</span>
+                                                                <span class="text-emerald-400 font-bold text-[11px]">₹{alloc.awvs ? Math.round(alloc.awvs).toLocaleString() : 0}</span>
+                                                            </div>
+                                                            <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[9px] text-gray-400">
+                                                                <div><b>Weight:</b> {alloc.weight_tons} T</div>
+                                                                <div><b>Haulage:</b> {alloc.distance_km} km</div>
+                                                                <div><b>Energy Yield:</b> {alloc.estimated_energy_kwh} kWh</div>
+                                                                <div><b>Pre-Drying Offset:</b> {alloc.heat_recovery_utilized ? 'Utilized' : 'None'}</div>
+                                                            </div>
+                                                            <p class="text-[9px] text-violet-300 bg-violet-950/20 border border-violet-500/10 p-2 rounded-lg leading-relaxed mt-1">
+                                                                <b>Decision:</b> {alloc.recommendation_reason}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+
+                                                    {lastRunDetails.optimization?.comparison && (
+                                                        <div class="p-3 bg-indigo-950/20 border border-indigo-500/20 rounded-xl space-y-2">
+                                                            <div class="font-bold text-indigo-300 uppercase text-[9px] tracking-wider flex items-center gap-1.5">
+                                                                <Icon name="activity" className="w-3.5 h-3.5 text-indigo-400" />
+                                                                Classical MILP vs. CNN Classifier Benchmark
+                                                            </div>
+                                                            <div class="grid grid-cols-2 gap-2 text-[10px]">
+                                                                <div class="bg-[#0b0f19] p-2 rounded border border-glassBorder">
+                                                                    <div class="text-[8px] text-gray-500 uppercase">CNN AI Solver</div>
+                                                                    <div class="font-bold text-accentPurple mt-0.5">{lastRunDetails.optimization.comparison.qaoa_time_ms.toFixed(1)} ms</div>
+                                                                    <div class="text-[8px] text-gray-400 mt-0.5">Allocated: {lastRunDetails.optimization.comparison.qaoa_allocations_count} batches</div>
+                                                                </div>
+                                                                <div class="bg-[#0b0f19] p-2 rounded border border-glassBorder">
+                                                                    <div class="text-[8px] text-gray-500 uppercase">Classical MILP</div>
+                                                                    <div class="font-bold text-emerald-400 mt-0.5">{lastRunDetails.optimization.comparison.milp_time_ms.toFixed(1)} ms</div>
+                                                                    <div class="text-[8px] text-gray-400 mt-0.5">Allocated: {lastRunDetails.optimization.comparison.milp_allocations_count} batches</div>
+                                                                </div>
+                                                            </div>
+                                                            <p class="text-[8px] text-gray-400 italic text-center mt-1">
+                                                                SmartWasteAI CNN + MILP solver guarantees high-speed convergence.
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div class="text-[10px] text-gray-500 border-t border-glassBorder/60 pt-3">
+                                            Multi-objective optimization solved using CNN Feature Analysis and Scipy Mixed-Integer Linear Programming.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Decision Support Panel & Alerts */}
+                            <div class="info-panel p-5 rounded-2xl flex flex-col space-y-4">
+                                <h2 class="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                                    <Icon name="settings" className="w-4 h-4 text-accentTeal" />
+                                    Decision Support & Alerts
+                                </h2>
+                                
+                                {/* Smart Alerts Feed */}
+                                <div class="space-y-2 max-h-36 overflow-y-auto custom-scrollbar">
+                                    {summary?.alerts.map((alert, idx) => (
+                                        <div key={idx} class={`p-2 rounded-lg border text-[10px] flex items-start justify-between gap-1.5 ${alert.type === 'CRITICAL' ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' : alert.type === 'WARNING' ? 'bg-amber-500/10 border-amber-500/20 text-amber-300' : 'bg-blue-500/10 border-blue-500/20 text-blue-300'}`}>
+                                            <div>
+                                                <span class="font-bold uppercase text-[8px] px-1 py-0.5 rounded bg-black/40 mr-1.5">{alert.type}</span>
+                                                <b>{alert.source}:</b> {alert.message}
+                                            </div>
+                                            <span class="text-[8px] text-gray-500 shrink-0">{alert.time}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Dynamic Municipality Recommendations */}
+                                <div class="p-3 bg-black border border-zinc-800 rounded-xl text-[10px] space-y-1.5">
+                                    <p class="font-bold text-white uppercase text-[9px] tracking-wider">Municipal Action Plan:</p>
+                                    <ul class="list-disc list-inside space-y-1 text-zinc-400">
+                                        <li>High moisture organics in Koyambedu. Sort before routing.</li>
+                                        <li>Kodungaiyur WtE plant heat recovery at capacity. Pre-dry waste at Perungudi.</li>
+                                        <li>Zone 9 waste generation exceeds 7-day average. Deploy secondary trucks.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Financial Feasibility & Business value */}
+                            {summary?.business_metrics && (
+                                <div class="info-panel p-5 rounded-2xl space-y-3 bg-[#09090b] border border-zinc-800">
+                                    <h2 class="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                                        <Icon name="currency-inr" className="w-4 h-4 text-emerald-400" />
+                                        Municipal Savings & Feasibility
+                                    </h2>
+                                    <div class="text-[10px] space-y-2 text-zinc-400">
+                                        <div class="flex justify-between border-b border-zinc-800 pb-1.5">
+                                            <span>Monthly Saved Fuel:</span>
+                                            <span class="font-bold text-white">{summary.business_metrics.fuel_saved_liters.toLocaleString()} Liters</span>
+                                        </div>
+                                        <div class="flex justify-between border-b border-zinc-800 pb-1.5">
+                                            <span>Fuel Cost Savings:</span>
+                                            <span class="font-bold text-emerald-400">₹{summary.business_metrics.fuel_savings_inr.toLocaleString()}</span>
+                                        </div>
+                                        <div class="flex justify-between border-b border-zinc-800 pb-1.5">
+                                            <span>Landfill Tipping Fee Saved:</span>
+                                            <span class="font-bold text-white">₹{summary.business_metrics.tipping_fee_savings_inr.toLocaleString()}</span>
+                                        </div>
+                                        <div class="flex justify-between border-b border-zinc-800 pb-1.5">
+                                            <span>Compost & Material Sales:</span>
+                                            <span class="font-bold text-white">₹{(summary.business_metrics.recyclable_sales_inr + summary.business_metrics.energy_revenue_inr).toLocaleString()}</span>
+                                        </div>
+                                        <div class="flex justify-between border-b border-zinc-800 pb-1.5">
+                                            <span>Carbon Revenue Potential:</span>
+                                            <span class="font-bold text-emerald-400">₹{summary.business_metrics.carbon_revenue_inr.toLocaleString()}</span>
+                                        </div>
+                                        <div class="flex justify-between border-b border-zinc-800 pb-1.5 pt-1 font-bold text-white">
+                                            <span>Est. Project ROI:</span>
+                                            <span class="text-emerald-400">{summary.business_metrics.roi_pct}%</span>
+                                        </div>
+                                        <div class="flex justify-between font-bold text-white">
+                                            <span>Capital Payback Period:</span>
+                                            <span class="text-teal-400">{summary.business_metrics.payback_period_years} Years</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    {% endraw %}
+    </script>
+</body>
+</html>

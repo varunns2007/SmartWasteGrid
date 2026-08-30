@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartWasteGrid | AI Waste Grid & Density Monitoring System</title>
+    <meta name="description" content="AI-Powered Waste Detection & Smart Spatial Grid Management System">
+    
+    <!-- CSS Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="navbar">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <i class="fa-solid fa-dumpster-fire"></i>
+            </div>
+            <div class="logo-text">
+                <h1>SmartWasteGrid</h1>
+                <p>AI Spatial Grid & Waste Intelligence</p>
+            </div>
+        </div>
+
+        <div class="header-badges">
+            <div class="badge badge-live">
+                <span class="badge-pulse"></span>
+                GRID ENGINE ACTIVE
+            </div>
+            <div class="badge">
+                <i class="fa-solid fa-brain"></i>
+                Model: {{ model_info.model_name }}
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Workspace -->
+    <main class="dashboard-container">
+        
+        <!-- Primary Vision & Grid Canvas Panel -->
+        <section class="main-content">
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-camera-retro"></i> Live Sector Camera & Grid Analytics</h2>
+                    <div class="badge">
+                        3x3 Matrix Grid (A1 - C3)
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="control-toolbar">
+                    <button id="btn-run-detection" class="btn btn-primary">
+                        <i class="fa-solid fa-bolt"></i> Run Waste Analysis
+                    </button>
+                    <button id="btn-upload" class="btn btn-secondary">
+                        <i class="fa-solid fa-upload"></i> Upload Image
+                    </button>
+                    <input type="file" id="file-input" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- Viewport Canvas -->
+                <div class="viewport-container">
+                    <img id="viewport-img" src="{{ url_for('get_sample_image') }}" alt="Grid Detection Feed" class="viewport-img">
+                </div>
+
+                <!-- Spatial Grid Matrix Occupancy (A1 to C3) -->
+                <div class="card-header" style="margin-top: 1.5rem; margin-bottom: 0.8rem;">
+                    <h2><i class="fa-solid fa-table-cells-large"></i> Sector Density & Fill Levels</h2>
+                </div>
+                <div id="grid-matrix-container" class="grid-overlay-matrix">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Sidebar Analytics & Telemetry -->
+        <aside class="sidebar">
+
+            <!-- High Level Metrics -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-chart-pie"></i> Detection Overview</h2>
+                </div>
+                
+                <div class="metric-grid">
+                    <div class="stat-box">
+                        <div id="stat-total-waste" class="stat-number">0</div>
+                        <div class="stat-label">Items Detected</div>
+                    </div>
+                    <div class="stat-box">
+                        <div id="stat-peak-sector" class="stat-number">--</div>
+                        <div class="stat-label">Peak Risk Sector</div>
+                    </div>
+                    <div class="stat-box">
+                        <div id="stat-peak-fill" class="stat-number">0%</div>
+                        <div class="stat-label">Peak Sector Load</div>
+                    </div>
+                    <div class="stat-box">
+                        <div id="stat-map-accuracy" class="stat-number">{{ (model_info.mAP50 * 100)|round(1) }}%</div>
+                        <div class="stat-label">mAP@50 Accuracy</div>
+                    </div>
+                </div>
+
+                <!-- Category Breakdown -->
+                <div class="card-header" style="margin-top: 1.2rem; margin-bottom: 0.6rem;">
+                    <h3 style="font-size: 0.95rem; font-weight: 700; color: #9ca3af;"><i class="fa-solid fa-boxes-stacked"></i> Waste Classification</h3>
+                </div>
+                <div id="category-breakdown">
+                    <!-- Category list items -->
+                </div>
+            </div>
+
+            <!-- IoT Bin Telemetry -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-wifi"></i> IoT Bins Grid Telemetry</h2>
+                    <span style="font-size: 0.75rem; color: #10b981;">Live Updates</span>
+                </div>
+                <div id="iot-bin-list">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- Client Controller Script -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

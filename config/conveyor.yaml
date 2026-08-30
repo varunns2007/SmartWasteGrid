@@ -1,0 +1,20 @@
+camera_id: CAM_001
+camera_index: 1
+resolution:
+  width: 1280
+  height: 720
+roi:
+  enabled: false
+  x1: 0
+  y1: 0
+  x2: 1280
+  y2: 720
+confidence_threshold: 0.4
+imgsz: 640
+device: 0
+temporal_stabilization:
+  enabled: true
+  minimum_confirmed_frames: 3
+  iou_threshold: 0.45
+batch_duration_seconds: 10
+default_waste_weight_kg: 12.5
