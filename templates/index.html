@@ -299,10 +299,13 @@
             };
 
             const clearDetections = async () => {
-                if (!confirm("Are you sure you want to purge all old detection records from the database?")) return;
+                if (!confirm("Are you sure you want to purge all detection records from the database?")) return;
                 try {
-                    await fetch('/api/database/detections/clear', { method: 'POST' });
-                    fetchExtensionData();
+                    const res = await fetch('/api/database/detections/clear', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status === 'SUCCESS' || data.status === 'success') {
+                        fetchExtensionData();
+                    }
                 } catch (err) {
                     console.error("Error clearing detections:", err);
                 }
@@ -562,19 +565,6 @@
                 if (summary.plants) summary.plants.forEach(p => bounds.extend([p.lat, p.lng]));
                 if (summary.trucks) summary.trucks.forEach(t => bounds.extend([t.lat, t.lng]));
                 if (bounds.isValid()) mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
-            };
-
-            const clearDetections = async () => {
-                if (!confirm("Are you sure you want to clear all camera detection records from the database?")) return;
-                try {
-                    const res = await fetch('/api/database/detections/clear', { method: 'POST' });
-                    const data = await res.json();
-                    if (data.status === 'SUCCESS' || data.status === 'success') {
-                        fetchExtensionData();
-                    }
-                } catch (err) {
-                    console.error("Error clearing detections:", err);
-                }
             };
 
             const runSimulation = async () => {
