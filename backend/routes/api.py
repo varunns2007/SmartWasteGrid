@@ -222,6 +222,18 @@ def get_db_detections():
     res = WasteService.get_database_detections(page=page, limit=limit, station=station, category=category)
     return jsonify(res)
 
+@api_bp.route('/database/detections/clear', methods=['POST', 'DELETE'])
+def clear_db_detections():
+    from backend.flask_db.db import db
+    from backend.flask_models.models import ConveyorItem
+    try:
+        deleted = ConveyorItem.query.delete()
+        db.session.commit()
+        return jsonify({'status': 'SUCCESS', 'deleted_count': deleted, 'message': 'All detection records purged.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'ERROR', 'error': str(e)}), 500
+
 @api_bp.route('/database/batches', methods=['GET'])
 def get_db_batches():
     page = request.args.get('page', 1, type=int)

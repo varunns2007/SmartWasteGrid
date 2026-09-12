@@ -81,6 +81,9 @@ class VideoCamera:
         self.sim_tick = 0
         self.use_hardware_cam = False
         self.force_simulation = False  # Start in hardware mode by default
+        self.tracked_objects = []  # Tracks unique physical objects across frames
+        self.logged_track_ids = set() # Set of already-logged ByteTrack track IDs
+        self.tracked_lock = threading.Lock()
 
         self.class_names = {0: 'wet', 1: 'dry', 2: 'recyclable'}
         self.class_colors = {
@@ -217,7 +220,6 @@ class VideoCamera:
                         self.use_hardware_cam = True
                         success = True
                     else:
-                        # Release invalid capture to allow re-initialization
                         try:
                             self.cap.release()
                         except Exception:
@@ -235,21 +237,62 @@ class VideoCamera:
             if self.use_hardware_cam and self.model is not None and self.current_frame is not None:
                 try:
                     frame_copy = self.current_frame.copy()
-                    results = self.model.predict(source=frame_copy, conf=0.28, verbose=False)
+                    # Use YOLO tracker with persistence
+                    try:
+                        results = self.model.track(source=frame_copy, persist=True, conf=0.45, verbose=False)
+                    except Exception:
+                        results = self.model.predict(source=frame_copy, conf=0.45, verbose=False)
+
                     boxes_list = []
-                    if results and len(results) > 0:
-                        boxes = results[0].boxes
-                        if boxes is not None and len(boxes) > 0:
-                            for box in boxes:
-                                x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-                                cls_id = int(box.cls[0].cpu().numpy())
-                                conf = float(box.conf[0].cpu().numpy())
-                                boxes_list.append((x1, y1, x2, y2, cls_id, conf))
-                                
-                                self.log_detection_to_db(cls_id, self.class_names.get(cls_id, 'waste'), conf)
+                    now = time.time()
+
+                    with self.tracked_lock:
+                        # Retain spatial tracking memory for 60 seconds
+                        self.tracked_objects = [obj for obj in self.tracked_objects if (now - obj.get("last_seen", 0)) < 60.0]
+
+                        if results and len(results) > 0:
+                            boxes = results[0].boxes
+                            if boxes is not None and len(boxes) > 0:
+                                for box in boxes:
+                                    x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                                    cls_id = int(box.cls[0].cpu().numpy())
+                                    conf = float(box.conf[0].cpu().numpy())
+                                    cx = (x1 + x2) // 2
+                                    cy = (y1 + y2) // 2
+                                    track_id = int(box.id[0].cpu().numpy()) if box.id is not None else None
+
+                                    boxes_list.append((x1, y1, x2, y2, cls_id, conf))
+
+                                    # Check if already logged via ByteTrack ID
+                                    if track_id is not None:
+                                        if track_id not in self.logged_track_ids:
+                                            self.logged_track_ids.add(track_id)
+                                            self.log_detection_to_db(cls_id, self.class_names.get(cls_id, 'waste'), conf)
+                                    else:
+                                        # Fallback to spatial tracking
+                                        matched = False
+                                        for obj in self.tracked_objects:
+                                            dist = ((obj["cx"] - cx) ** 2 + (obj["cy"] - cy) ** 2) ** 0.5
+                                            if obj["cls_id"] == cls_id and dist < 120:
+                                                obj["cx"] = cx
+                                                obj["cy"] = cy
+                                                obj["last_seen"] = now
+                                                matched = True
+                                                break
+
+                                        if not matched and conf >= 0.50:
+                                            self.tracked_objects.append({
+                                                "cx": cx,
+                                                "cy": cy,
+                                                "cls_id": cls_id,
+                                                "first_seen": now,
+                                                "last_seen": now
+                                            })
+                                            self.log_detection_to_db(cls_id, self.class_names.get(cls_id, 'waste'), conf)
+
                     self.current_boxes = boxes_list
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[!] AI loop error: {e}")
             time.sleep(0.06)
 
     def log_detection_to_db(self, cls_id, cname, conf):
