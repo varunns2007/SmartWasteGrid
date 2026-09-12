@@ -237,17 +237,12 @@ class VideoCamera:
             if self.use_hardware_cam and self.model is not None and self.current_frame is not None:
                 try:
                     frame_copy = self.current_frame.copy()
-                    # Use YOLO tracker with persistence
-                    try:
-                        results = self.model.track(source=frame_copy, persist=True, conf=0.45, verbose=False)
-                    except Exception:
-                        results = self.model.predict(source=frame_copy, conf=0.45, verbose=False)
-
+                    results = self.model.predict(source=frame_copy, conf=0.45, verbose=False)
                     boxes_list = []
                     now = time.time()
 
                     with self.tracked_lock:
-                        # Retain spatial tracking memory for 60 seconds
+                        # Retain spatial tracking memory for 60 seconds to prevent re-logging stationary objects
                         self.tracked_objects = [obj for obj in self.tracked_objects if (now - obj.get("last_seen", 0)) < 60.0]
 
                         if results and len(results) > 0:
@@ -259,36 +254,30 @@ class VideoCamera:
                                     conf = float(box.conf[0].cpu().numpy())
                                     cx = (x1 + x2) // 2
                                     cy = (y1 + y2) // 2
-                                    track_id = int(box.id[0].cpu().numpy()) if box.id is not None else None
 
                                     boxes_list.append((x1, y1, x2, y2, cls_id, conf))
 
-                                    # Check if already logged via ByteTrack ID
-                                    if track_id is not None:
-                                        if track_id not in self.logged_track_ids:
-                                            self.logged_track_ids.add(track_id)
-                                            self.log_detection_to_db(cls_id, self.class_names.get(cls_id, 'waste'), conf)
-                                    else:
-                                        # Fallback to spatial tracking
-                                        matched = False
-                                        for obj in self.tracked_objects:
-                                            dist = ((obj["cx"] - cx) ** 2 + (obj["cy"] - cy) ** 2) ** 0.5
-                                            if obj["cls_id"] == cls_id and dist < 120:
-                                                obj["cx"] = cx
-                                                obj["cy"] = cy
-                                                obj["last_seen"] = now
-                                                matched = True
-                                                break
+                                    # Match against currently tracked objects (distance < 120 pixels)
+                                    matched = False
+                                    for obj in self.tracked_objects:
+                                        dist = ((obj["cx"] - cx) ** 2 + (obj["cy"] - cy) ** 2) ** 0.5
+                                        if obj["cls_id"] == cls_id and dist < 120:
+                                            obj["cx"] = cx
+                                            obj["cy"] = cy
+                                            obj["last_seen"] = now
+                                            matched = True
+                                            break
 
-                                        if not matched and conf >= 0.50:
-                                            self.tracked_objects.append({
-                                                "cx": cx,
-                                                "cy": cy,
-                                                "cls_id": cls_id,
-                                                "first_seen": now,
-                                                "last_seen": now
-                                            })
-                                            self.log_detection_to_db(cls_id, self.class_names.get(cls_id, 'waste'), conf)
+                                    if not matched and conf >= 0.50:
+                                        # New unique physical item entered conveyor view
+                                        self.tracked_objects.append({
+                                            "cx": cx,
+                                            "cy": cy,
+                                            "cls_id": cls_id,
+                                            "first_seen": now,
+                                            "last_seen": now
+                                        })
+                                        self.log_detection_to_db(cls_id, self.class_names.get(cls_id, 'waste'), conf)
 
                     self.current_boxes = boxes_list
                 except Exception as e:
