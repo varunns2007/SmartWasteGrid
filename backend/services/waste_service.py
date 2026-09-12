@@ -287,24 +287,22 @@ class WasteService:
         cname, decision = CLASS_MAPPING[cls_id]
         item_name, default_wt = random.choice(WASTE_CATALOG[cls_id])
         confidence = random.uniform(0.88, 0.99)
-        weight_kg = default_wt + random.uniform(-0.05, 0.10)
+        weight_kg = round(default_wt + random.uniform(-0.05, 0.10), 2)
         
-        new_item = ConveyorItem(
-            item_name=item_name,
-            class_id=cls_id,
-            class_name=cname,
-            confidence=confidence,
-            sorting_decision=decision,
-            item_weight_kg=weight_kg,
-            camera_id="CONVEYOR_CAM_01"
-        )
-        db.session.add(new_item)
-        db.session.commit()
-
-        # Ledger Entry for Detection
-        LedgerEntry.create_entry('DETECTION', new_item.to_dict(), f"Scanned Detection #{new_item.id}: {item_name}")
-
-        return new_item.to_dict()
+        # Return simulation dictionary without saving fake items to production database
+        sim_item = {
+            'id': 0,
+            'item_name': f"[SIMULATION] {item_name}",
+            'class_id': cls_id,
+            'class_name': cname,
+            'confidence': round(confidence, 4),
+            'sorting_decision': decision,
+            'item_weight_kg': weight_kg,
+            'camera_id': "SIMULATION_TWIN",
+            'timestamp': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+            'is_simulation': True
+        }
+        return sim_item
 
     @staticmethod
     def get_live_conveyor_items(limit=20):

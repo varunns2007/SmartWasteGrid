@@ -253,14 +253,17 @@ class VideoCamera:
             time.sleep(0.06)
 
     def log_detection_to_db(self, cls_id, cname, conf):
+        if not self.use_hardware_cam:
+            return  # Strictly do not log simulated items to the database
+
         now = time.time()
-        if now - self.last_db_log_time < 2.5:
+        if now - self.last_db_log_time < 2.0:
             return  
         self.last_db_log_time = now
 
         try:
             from backend.flask_db.db import db
-            from backend.flask_models.models import ConveyorItem
+            from backend.flask_models.models import ConveyorItem, LedgerEntry
             from flask import current_app
             
             ctx = None
@@ -272,13 +275,13 @@ class VideoCamera:
             if ctx:
                 with ctx:
                     item_names = {
-                        0: "Organic Waste Item",
-                        1: "Non-Recyclable Dry Scrap",
-                        2: "PET Plastic / Recyclable Bottle"
+                        0: "Live Organic / Wet Waste",
+                        1: "Live Dry Scrap / RDF",
+                        2: "Live Recyclable / PET Bottle"
                     }
-                    item_name = item_names.get(cls_id, f"Live Waste Object #{cls_id}")
+                    item_name = item_names.get(cls_id, f"Live Detected Waste (Class {cls_id})")
                     bin_decision = self.sorting_bins.get(cls_id, "GENERAL BIN")
-                    item_weight = round(float(np.random.uniform(0.15, 0.85)), 2)
+                    item_weight = round(float(np.random.uniform(0.15, 0.65)), 2)
 
                     item = ConveyorItem(
                         item_name=item_name,
@@ -287,13 +290,22 @@ class VideoCamera:
                         confidence=float(conf),
                         sorting_decision=bin_decision,
                         item_weight_kg=item_weight,
-                        camera_id=f"LIVE_EDGE_CAM_{self.camera_index}",
+                        camera_id=f"LIVE_WEBCAM_CAM_{self.camera_index}",
                         timestamp=datetime.utcnow()
                     )
                     db.session.add(item)
                     db.session.commit()
-        except Exception:
-            pass
+
+                    try:
+                        LedgerEntry.create_entry(
+                            'CAMERA_DETECTION', 
+                            item.to_dict(), 
+                            f"Live Webcam Intake: {item_name} (Confidence: {int(conf*100)}%)"
+                        )
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[!] Error logging camera detection to DB: {e}")
 
     def get_frame(self):
         if not hasattr(self, 'current_frame') or self.current_frame is None or np.mean(self.current_frame) < 1.0:
