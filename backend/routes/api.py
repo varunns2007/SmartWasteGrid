@@ -54,6 +54,81 @@ def get_transit_telemetry():
     result = WasteService.get_transit_center_telemetry(station_name)
     return jsonify(result)
 
+@api_bp.route('/config', methods=['GET'])
+def get_config():
+    import os
+    from backend.camera_stream import get_configured_camera_index
+    gmap_key = os.getenv('GOOGLE_MAPS_API_KEY', '').strip()
+    return jsonify({
+        'google_maps_api_key': gmap_key,
+        'has_google_maps_key': bool(gmap_key),
+        'camera_index': get_configured_camera_index(),
+        'area_name': os.getenv('AREA_NAME', 'Chennai Metropolitan ULB'),
+        'api_version': '2.0.0-2026'
+    })
+
+@api_bp.route('/config/maps-key', methods=['POST'])
+def update_maps_key():
+    import os
+    data = request.json or {}
+    new_key = data.get('api_key', '').strip()
+    os.environ['GOOGLE_MAPS_API_KEY'] = new_key
+    
+    # Also update .env file if present
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
+    try:
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            if 'GOOGLE_MAPS_API_KEY=' in content:
+                import re
+                content = re.sub(r'GOOGLE_MAPS_API_KEY=.*', f'GOOGLE_MAPS_API_KEY={new_key}', content)
+            else:
+                content += f"\nGOOGLE_MAPS_API_KEY={new_key}\n"
+            with open(env_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+    except Exception as e:
+        print(f"[!] Note on updating .env: {e}")
+
+    return jsonify({
+        'status': 'SUCCESS',
+        'google_maps_api_key': new_key,
+        'has_google_maps_key': bool(new_key)
+    })
+
+@api_bp.route('/webcams', methods=['GET'])
+def get_webcams():
+    from backend.camera_stream import detect_connected_webcams, VideoCamera
+    cams = detect_connected_webcams()
+    cam_inst = VideoCamera()
+    return jsonify({
+        'webcams': cams,
+        'current_index': cam_inst.camera_index,
+        'mode': 'simulation' if cam_inst.force_simulation else 'hardware',
+        'is_hardware_active': cam_inst.use_hardware_cam
+    })
+
+@api_bp.route('/trucks/search', methods=['GET'])
+def search_trucks():
+    q = (request.args.get('q') or '').strip().lower()
+    trucks = WasteService.get_all_trucks()
+    if not q:
+        return jsonify(trucks)
+    
+    filtered = []
+    for t in trucks:
+        reg = (t.get('registration_number') or '').lower()
+        plant = (t.get('assigned_plant_name') or '').lower()
+        driver = (t.get('driver_name') or '').lower()
+        status = (t.get('route_status') or '').lower()
+        b = t.get('batch') or {}
+        b_id = str(b.get('batch_id', ''))
+        st = (b.get('station') or '').lower()
+
+        if q in reg or q in plant or q in driver or q in status or q in b_id or q in st:
+            filtered.append(t)
+    return jsonify(filtered)
+
 @api_bp.route('/camera/mode', methods=['GET', 'POST'])
 def camera_mode():
     from backend.camera_stream import VideoCamera
@@ -61,7 +136,9 @@ def camera_mode():
     if request.method == 'POST':
         data = request.json or {}
         mode = data.get('mode', 'hardware').lower()
-        idx = data.get('camera_index') or data.get('index')
+        idx = data.get('camera_index')
+        if idx is None:
+            idx = data.get('index')
         if idx is not None:
             try:
                 cam.set_camera_index(int(idx))
@@ -69,8 +146,19 @@ def camera_mode():
                 pass
         sim_enabled = (mode == 'simulation')
         cam.set_simulation_mode(sim_enabled)
-        return jsonify({'status': 'SUCCESS', 'simulation_mode': sim_enabled, 'mode': 'simulation' if sim_enabled else 'hardware', 'camera_index': cam.camera_index})
-    return jsonify({'simulation_mode': cam.force_simulation, 'mode': 'simulation' if cam.force_simulation else 'hardware', 'camera_index': cam.camera_index})
+        return jsonify({
+            'status': 'SUCCESS',
+            'simulation_mode': sim_enabled,
+            'mode': 'simulation' if sim_enabled else 'hardware',
+            'camera_index': cam.camera_index,
+            'is_hardware_active': cam.use_hardware_cam
+        })
+    return jsonify({
+        'simulation_mode': cam.force_simulation,
+        'mode': 'simulation' if cam.force_simulation else 'hardware',
+        'camera_index': cam.camera_index,
+        'is_hardware_active': cam.use_hardware_cam
+    })
 
 @api_bp.route('/conveyor/simulate', methods=['POST'])
 def simulate_conveyor_detection():

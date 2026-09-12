@@ -7,7 +7,7 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <!-- Leaflet Map CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -24,20 +24,21 @@
             theme: {
                 extend: {
                     colors: {
-                        darkBg: '#0d0f12',
-                        cardBg: '#14181d',
+                        darkBg: '#090b0e',
+                        cardBg: '#12161c',
                         glassBorder: 'rgba(157, 190, 183, 0.18)',
                         paletteCream: '#efe6d5',
                         paletteTeal: '#9dbeb7',
                         paletteRed: '#e73213',
-                        accentPurple: '#9dbeb7',
-                        accentBlue: '#9dbeb7',
-                        accentGreen: '#efe6d5',
-                        accentAmber: '#e73213',
+                        accentPurple: '#a855f7',
+                        accentBlue: '#38bdf8',
+                        accentGreen: '#10b981',
+                        accentAmber: '#f59e0b',
                         accentRose: '#e73213'
                     },
                     fontFamily: {
-                        sans: ['Outfit', 'sans-serif']
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
                     }
                 }
             }
@@ -45,40 +46,32 @@
     </script>
     <style>
         body {
-            background-color: #0d0f12;
+            background-color: #090b0e;
             color: #efe6d5;
             font-family: 'Outfit', sans-serif;
         }
         .info-panel {
-            background: rgba(20, 24, 29, 0.85);
-            backdrop-filter: blur(14px);
+            background: rgba(18, 22, 28, 0.88);
+            backdrop-filter: blur(16px);
             border: 1px solid rgba(157, 190, 183, 0.18);
         }
-        .conveyor-belt-scroll {
-            animation: conveyorMove 2s linear infinite;
-        }
-        @keyframes conveyorMove {
-            0% { background-position: 0 0; }
-            100% { background-position: 40px 0; }
-        }
         .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-            height: 4px;
+            width: 5px;
+            height: 5px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-            background: #0d0f12;
+            background: #090b0e;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #9dbeb7;
             border-radius: 4px;
         }
-        /* Custom Leaflet Dark Popups & Animated Map Markers with Curated Palette */
         .leaflet-popup-content-wrapper {
             background: #0d0f12 !important;
             color: #efe6d5 !important;
             border: 1px solid rgba(157, 190, 183, 0.3) !important;
             border-radius: 14px !important;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.8) !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8) !important;
             padding: 0 !important;
         }
         .leaflet-popup-content {
@@ -90,7 +83,7 @@
             border: 1px solid rgba(157, 190, 183, 0.3) !important;
         }
         .leaflet-container {
-            background: #0d0f12 !important;
+            background: #e5e7eb !important;
             font-family: 'Outfit', sans-serif !important;
         }
         .marker-pulse {
@@ -117,6 +110,23 @@
         }
         @keyframes routeDash {
             to { stroke-dashoffset: -1000; }
+        }
+        /* Custom Truck Marker Pin */
+        .truck-leaflet-pin {
+            background: #e73213;
+            color: #ffffff;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 4px 14px rgba(231, 50, 19, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .truck-leaflet-pin:hover {
+            transform: scale(1.2);
         }
     </style>
 </head>
@@ -149,7 +159,33 @@
                 case "bar-chart": return (<svg {...svgProps}><path d="M3 3v18h18" /><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" /></svg>);
                 case "cpu": return (<svg {...svgProps}><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" /></svg>);
                 case "map-pin": return (<svg {...svgProps}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>);
+                case "camera": return (<svg {...svgProps}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>);
+                case "search": return (<svg {...svgProps}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>);
+                case "refresh": return (<svg {...svgProps}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>);
                 default: return null;
+            }
+        };
+
+        const MAP_TILE_PRESETS = {
+            osmRoad: {
+                name: "Full Road & Street View",
+                url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                attrib: "&copy; OpenStreetMap contributors (Full Detailed Road View)"
+            },
+            esriRoad: {
+                name: "Esri Highway & Streets",
+                url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+                attrib: "Tiles &copy; Esri World Street Map"
+            },
+            esriSatellite: {
+                name: "Satellite Imagery",
+                url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attrib: "Tiles &copy; Esri World Imagery"
+            },
+            cartoVoyager: {
+                name: "City Voyager Map",
+                url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                attrib: "&copy; OpenStreetMap &copy; CARTO"
             }
         };
 
@@ -162,14 +198,19 @@
             const [numBatchesToSimulate, setNumBatchesToSimulate] = useState(3);
             const [solverMode, setSolverMode] = useState('cnn_milp');
             const [lastRunDetails, setLastRunDetails] = useState(null);
-            const [selectedBatchDetails, setSelectedBatchDetails] = useState(null);
             const [activeTab, setActiveTab] = useState('batches');
-            const [activeForecastingZone, setActiveForecastingZone] = useState('Zone 9 (Teynampet)');
 
             const [activeTransitStation, setActiveTransitStation] = useState("Mylapore Transfer Station");
             const [transitTelemetry, setTransitTelemetry] = useState(null);
             const [transitConveyorLogs, setTransitConveyorLogs] = useState([]);
             const [transitLiveMode, setTransitLiveMode] = useState(true);
+            const [feedTimestamp, setFeedTimestamp] = useState(Date.now());
+
+            // Camera Hardware State
+            const [cameraMode, setCameraMode] = useState('hardware');
+            const [cameraIdx, setCameraIdx] = useState(0);
+            const [availableWebcams, setAvailableWebcams] = useState([]);
+            const [isHardwareActive, setIsHardwareActive] = useState(false);
 
             // Extension States
             const [dbSubTab, setDbSubTab] = useState('detections');
@@ -185,10 +226,29 @@
             const [diversionData, setDiversionData] = useState(null);
             const [mrvData, setMrvData] = useState(null);
 
+            // Map States
+            const [mapStyleKey, setMapStyleKey] = useState('osmRoad');
+            const [mapFilter, setMapFilter] = useState('all');
+            const [truckSearchQuery, setTruckSearchQuery] = useState('');
+            const [selectedTruck, setSelectedTruck] = useState(null);
+
             const mapContainerRef = useRef(null);
             const mapInstance = useRef(null);
             const mapMarkersGroup = useRef(null);
-            const animatedTrucksGroup = useRef(null);
+            const mapRoutesGroup = useRef(null);
+            const mapTileLayerRef = useRef(null);
+
+            const fetchWebcams = async () => {
+                try {
+                    const res = await fetch('/api/webcams').then(r => r.json());
+                    if (res.webcams) setAvailableWebcams(res.webcams);
+                    if (res.current_index !== undefined) setCameraIdx(res.current_index);
+                    if (res.mode) setCameraMode(res.mode);
+                    setIsHardwareActive(!!res.is_hardware_active);
+                } catch (err) {
+                    console.error("Webcams fetch error:", err);
+                }
+            };
 
             const fetchData = async () => {
                 try {
@@ -239,10 +299,8 @@
             };
 
             useEffect(() => {
+                fetchWebcams();
                 fetchData();
-                fetch('/api/camera/mode').then(r => r.json()).then(res => {
-                    if (res && res.mode) setCameraMode(res.mode);
-                }).catch(err => console.error(err));
             }, []);
 
             useEffect(() => {
@@ -275,231 +333,7 @@
                 };
             }, [transitLiveMode, activeTab, activeTransitStation]);
 
-            const [mapStyle, setMapStyle] = useState('cartoDark');
-            const [mapFilter, setMapFilter] = useState('all');
-            const tileLayerRef = useRef(null);
-            const routesLayerGroup = useRef(null);
-
-            const switchMapStyle = (styleKey) => {
-                setMapStyle(styleKey);
-                if (!mapInstance.current) return;
-                if (tileLayerRef.current) {
-                    mapInstance.current.removeLayer(tileLayerRef.current);
-                }
-                
-                let url = 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png';
-                let attrib = '&copy; OpenStreetMap &copy; CARTO (Free No-API-Key Dark Tiles)';
-                
-                if (styleKey === 'esriSatellite') {
-                    url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-                    attrib = 'Tiles &copy; Esri (Free Open Satellite)';
-                } else if (styleKey === 'osmStandard') {
-                    url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-                    attrib = '&copy; OpenStreetMap contributors (Free Standard Tiles)';
-                }
-                
-                tileLayerRef.current = L.tileLayer(url, {
-                    attribution: attrib,
-                    maxZoom: 19,
-                    subdomains: 'abcd'
-                }).addTo(mapInstance.current);
-            };
-
-            useEffect(() => {
-                if (mapContainerRef.current && !mapInstance.current && !loading) {
-                    mapInstance.current = L.map(mapContainerRef.current, {
-                        center: [13.04, 80.22],
-                        zoom: 11,
-                        zoomControl: true
-                    });
-
-                    tileLayerRef.current = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
-                        attribution: '&copy; OpenStreetMap &copy; CARTO',
-                        subdomains: 'abcd',
-                        maxZoom: 19
-                    }).addTo(mapInstance.current);
-
-                    routesLayerGroup.current = L.layerGroup().addTo(mapInstance.current);
-                    mapMarkersGroup.current = L.layerGroup().addTo(mapInstance.current);
-                    animatedTrucksGroup.current = L.layerGroup().addTo(mapInstance.current);
-                }
-            }, [loading]);
-
-            const fitMapBounds = () => {
-                if (!mapInstance.current || !summary) return;
-                const bounds = L.latLngBounds([]);
-                if (summary.plants) summary.plants.forEach(p => bounds.extend([p.lat, p.lng]));
-                if (summary.trucks) summary.trucks.forEach(t => bounds.extend([t.lat, t.lng]));
-                bounds.extend([13.0368, 80.2676]);
-                bounds.extend([13.0418, 80.2341]);
-                bounds.extend([12.9985, 80.2565]);
-                bounds.extend([13.0878, 80.1994]);
-                if (bounds.isValid()) {
-                    mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
-                }
-            };
-
-            const focusLiveEdge = () => {
-                if (mapInstance.current) {
-                    mapInstance.current.flyTo([13.0368, 80.2676], 14, { duration: 1.5 });
-                }
-            };
-
-            useEffect(() => {
-                if (mapInstance.current && mapMarkersGroup.current && summary) {
-                    mapInstance.current.invalidateSize();
-                    mapMarkersGroup.current.clearLayers();
-                    if (routesLayerGroup.current) routesLayerGroup.current.clearLayers();
-
-                    const transferStations = [
-                        { name: "Mylapore Transfer Station", lat: 13.0368, lng: 80.2676, weight: "12.4 Tons", org: "58%", rec: "28%" },
-                        { name: "T. Nagar Collection Hub", lat: 13.0418, lng: 80.2341, weight: "9.8 Tons", org: "62%", rec: "22%" },
-                        { name: "Adyar Transfer Hub", lat: 12.9985, lng: 80.2565, weight: "14.2 Tons", org: "48%", rec: "36%" },
-                        { name: "Anna Nagar West Station", lat: 13.0878, lng: 80.1994, weight: "11.5 Tons", org: "52%", rec: "31%" },
-                        { name: "Velachery Station Queue", lat: 12.9750, lng: 80.2210, weight: "8.6 Tons", org: "60%", rec: "24%" },
-                        { name: "Tambaram Central Queue", lat: 12.9249, lng: 80.1000, weight: "15.0 Tons", org: "44%", rec: "40%" }
-                    ];
-
-                    // Render Plants
-                    if (mapFilter === 'all' || mapFilter === 'wte' || mapFilter === 'compost' || mapFilter === 'recycling') {
-                        summary.plants.forEach(plant => {
-                            const isWte = plant.technology_type.includes('Energy') || plant.technology_type.includes('Gasification') || plant.technology_type.includes('RDF');
-                            const isCompost = plant.technology_type.includes('Composting') || plant.technology_type.includes('Biomethanation');
-                            const isRecycle = plant.technology_type.includes('Recycling');
-
-                            if (mapFilter === 'wte' && !isWte) return;
-                            if (mapFilter === 'compost' && !isCompost) return;
-                            if (mapFilter === 'recycling' && !isRecycle) return;
-
-                            let colorBg = 'bg-amber-500 shadow-amber-500/50';
-                            let badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-                            let iconLetter = '⚡';
-
-                            if (isCompost) {
-                                colorBg = 'bg-emerald-500 shadow-emerald-500/50';
-                                badgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-                                iconLetter = '🌱';
-                            } else if (isRecycle) {
-                                colorBg = 'bg-sky-500 shadow-sky-500/50';
-                                badgeColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
-                                iconLetter = '♻️';
-                            }
-
-                            const plantIcon = L.divIcon({
-                                html: `<div class="marker-pulse w-9 h-9 rounded-full ${colorBg} border-2 border-zinc-950 flex items-center justify-center shadow-xl cursor-pointer hover:scale-110 transition-transform">
-                                         <span class="text-xs font-bold text-white">${iconLetter}</span>
-                                       </div>`,
-                                className: 'custom-leaflet-icon',
-                                iconSize: [36, 36],
-                                iconAnchor: [18, 18]
-                            });
-
-                            const popupHtml = `
-                                <div class="p-3.5 font-sans min-w-[250px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
-                                    <div class="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
-                                        <span class="text-xs font-bold text-white uppercase">${plant.name}</span>
-                                        <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${badgeColor}">${plant.technology_type}</span>
-                                    </div>
-                                    <div class="space-y-1.5 text-[11px] text-zinc-300">
-                                        <div class="flex justify-between"><span>Max Capacity:</span> <strong class="text-white">${plant.capacity} Tons/day</strong></div>
-                                        <div class="flex justify-between"><span>Current Load:</span> <strong class="text-amber-400">${plant.utilization} Tons (${plant.utilization_pct}%)</strong></div>
-                                        <div class="w-full bg-zinc-900 h-2 rounded-full overflow-hidden my-1 border border-zinc-800">
-                                            <div class="bg-gradient-to-r from-emerald-500 to-amber-400 h-full" style="width: ${plant.utilization_pct}%"></div>
-                                        </div>
-                                        <div class="flex justify-between"><span>Heat Recovered:</span> <strong class="text-purple-300">${plant.recovered_heat_mw} MW</strong></div>
-                                        <div class="flex justify-between"><span>Processing Cost:</span> <strong class="text-emerald-300">₹${plant.processing_cost_per_ton}/Ton</strong></div>
-                                        <div class="flex justify-between"><span>Queue Length:</span> <strong class="text-sky-300">${plant.queue_length} Trucks Waiting</strong></div>
-                                    </div>
-                                </div>
-                            `;
-
-                            L.marker([plant.lat, plant.lng], { icon: plantIcon })
-                                .bindPopup(popupHtml)
-                                .addTo(mapMarkersGroup.current);
-                        });
-                    }
-
-                    // Render Transfer Stations
-                    if (mapFilter === 'all' || mapFilter === 'transfer') {
-                        transferStations.forEach(st => {
-                            const stIcon = L.divIcon({
-                                html: `<div class="w-8 h-8 rounded-xl bg-purple-600 border-2 border-zinc-950 flex items-center justify-center shadow-lg shadow-purple-500/40 cursor-pointer hover:scale-110 transition-transform">
-                                         <span class="text-xs font-bold text-white">📦</span>
-                                       </div>`,
-                                className: 'custom-leaflet-icon',
-                                iconSize: [32, 32],
-                                iconAnchor: [16, 16]
-                            });
-
-                            const popupHtml = `
-                                <div class="p-3 font-sans min-w-[230px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
-                                    <div class="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
-                                        <span class="text-xs font-bold text-purple-300 uppercase">${st.name}</span>
-                                        <span class="text-[9px] font-bold px-2 py-0.5 rounded border bg-purple-500/20 text-purple-300 border-purple-500/40">TRANSFER HUB</span>
-                                    </div>
-                                    <div class="space-y-1 text-[11px] text-zinc-300">
-                                        <div class="flex justify-between"><span>Queued Payload:</span> <strong class="text-white">${st.weight}</strong></div>
-                                        <div class="flex justify-between"><span>Organic Share:</span> <strong class="text-emerald-400">${st.org}</strong></div>
-                                        <div class="flex justify-between"><span>Recyclable Share:</span> <strong class="text-sky-400">${st.rec}</strong></div>
-                                    </div>
-                                </div>
-                            `;
-
-                            L.marker([st.lat, st.lng], { icon: stIcon })
-                                .bindPopup(popupHtml)
-                                .addTo(mapMarkersGroup.current);
-                        });
-                    }
-
-                    // Render Active Fleet Trucks
-                    if ((mapFilter === 'all' || mapFilter === 'fleet') && summary.trucks) {
-                        summary.trucks.forEach((truck, idx) => {
-                            const truckIcon = L.divIcon({
-                                html: `<div class="w-8 h-8 rounded-full bg-zinc-900 border-2 border-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/30 cursor-pointer hover:scale-110 transition-transform">
-                                         <span class="text-xs">🚛</span>
-                                       </div>`,
-                                className: 'custom-leaflet-icon',
-                                iconSize: [32, 32],
-                                iconAnchor: [16, 16]
-                            });
-
-                            const popupHtml = `
-                                <div class="p-3 font-sans min-w-[230px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
-                                    <div class="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
-                                        <span class="text-xs font-mono font-bold text-emerald-400">${truck.registration_number}</span>
-                                        <span class="text-[9px] font-bold px-2 py-0.5 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">${truck.route_status}</span>
-                                    </div>
-                                    <div class="space-y-1 text-[11px] text-zinc-300">
-                                        <div class="flex justify-between"><span>Capacity:</span> <strong class="text-white">${truck.capacity_tons} Tons</strong></div>
-                                        <div class="flex justify-between"><span>Telemetry Lat/Lng:</span> <strong class="text-zinc-400">${truck.lat.toFixed(3)}, ${truck.lng.toFixed(3)}</strong></div>
-                                    </div>
-                                </div>
-                            `;
-
-                            L.marker([truck.lat, truck.lng], { icon: truckIcon })
-                                .bindPopup(popupHtml)
-                                .addTo(mapMarkersGroup.current);
-
-                            // Connect Truck to nearest plant with glowing animated route polyline
-                            if (summary.plants && summary.plants[idx % summary.plants.length]) {
-                                const targetPlant = summary.plants[idx % summary.plants.length];
-                                const polyline = L.polyline([[truck.lat, truck.lng], [targetPlant.lat, targetPlant.lng]], {
-                                    color: '#10b981',
-                                    weight: 2,
-                                    opacity: 0.6,
-                                    className: 'route-flow-line'
-                                });
-                                polyline.bindTooltip(`Route Vector: ${truck.registration_number} → ${targetPlant.name}`, { sticky: true });
-                                polyline.addTo(routesLayerGroup.current);
-                            }
-                        });
-                    }
-                }
-            }, [summary, mapFilter]);
-
-            const [cameraMode, setCameraMode] = useState('hardware');
-            const [cameraIdx, setCameraIdx] = useState(1);
-
+            // Camera toggle
             const toggleCameraMode = async (newMode, targetIdx) => {
                 const modeToSet = newMode || (cameraMode === 'simulation' ? 'hardware' : 'simulation');
                 const indexToSet = targetIdx !== undefined ? targetIdx : cameraIdx;
@@ -511,9 +345,213 @@
                     }).then(r => r.json());
                     setCameraMode(res.mode);
                     if (res.camera_index !== undefined) setCameraIdx(res.camera_index);
+                    setIsHardwareActive(!!res.is_hardware_active);
+                    setFeedTimestamp(Date.now());
+                    fetchWebcams();
                 } catch (err) {
                     console.error("Error setting camera mode:", err);
                 }
+            };
+
+            // Switch Tile Layer
+            const switchMapStyle = (styleKey) => {
+                setMapStyleKey(styleKey);
+                if (!mapInstance.current || !window.L) return;
+                const preset = MAP_TILE_PRESETS[styleKey] || MAP_TILE_PRESETS.osmRoad;
+
+                if (mapTileLayerRef.current) {
+                    mapInstance.current.removeLayer(mapTileLayerRef.current);
+                }
+
+                mapTileLayerRef.current = L.tileLayer(preset.url, {
+                    attribution: preset.attrib,
+                    maxZoom: 19,
+                    subdomains: 'abc'
+                }).addTo(mapInstance.current);
+            };
+
+            // Initialize Map
+            useEffect(() => {
+                if (!mapContainerRef.current || loading || !summary || !window.L) return;
+
+                if (!mapInstance.current) {
+                    mapInstance.current = L.map(mapContainerRef.current, {
+                        center: [13.045, 80.225],
+                        zoom: 12,
+                        zoomControl: true
+                    });
+
+                    const preset = MAP_TILE_PRESETS.osmRoad;
+                    mapTileLayerRef.current = L.tileLayer(preset.url, {
+                        attribution: preset.attrib,
+                        maxZoom: 19,
+                        subdomains: 'abc'
+                    }).addTo(mapInstance.current);
+
+                    mapRoutesGroup.current = L.layerGroup().addTo(mapInstance.current);
+                    mapMarkersGroup.current = L.layerGroup().addTo(mapInstance.current);
+                }
+
+                renderMapEntities();
+            }, [loading, summary]);
+
+            // Re-render markers when filter or truck search changes
+            useEffect(() => {
+                renderMapEntities();
+            }, [mapFilter, truckSearchQuery, summary]);
+
+            const renderMapEntities = () => {
+                if (!mapInstance.current || !mapMarkersGroup.current || !summary || !window.L) return;
+
+                mapInstance.current.invalidateSize();
+                mapMarkersGroup.current.clearLayers();
+                if (mapRoutesGroup.current) mapRoutesGroup.current.clearLayers();
+
+                const transferStations = [
+                    { name: "Mylapore Transfer Station", lat: 13.0368, lng: 80.2676, weight: "12.4 Tons", org: "58%", rec: "28%" },
+                    { name: "T. Nagar Collection Hub", lat: 13.0418, lng: 80.2341, weight: "9.8 Tons", org: "62%", rec: "22%" },
+                    { name: "Adyar Transfer Hub", lat: 12.9985, lng: 80.2565, weight: "14.2 Tons", org: "48%", rec: "36%" },
+                    { name: "Anna Nagar West Station", lat: 13.0878, lng: 80.1994, weight: "11.5 Tons", org: "52%", rec: "31%" },
+                    { name: "Velachery Station Queue", lat: 12.9750, lng: 80.2210, weight: "8.6 Tons", org: "60%", rec: "24%" },
+                    { name: "Tambaram Central Queue", lat: 12.9249, lng: 80.1000, weight: "15.0 Tons", org: "44%", rec: "40%" }
+                ];
+
+                // 1. Render Treatment Plants
+                if (mapFilter === 'all' || mapFilter === 'wte' || mapFilter === 'compost' || mapFilter === 'recycling') {
+                    summary.plants.forEach(plant => {
+                        const isWte = (plant.technology_type || '').includes('Energy') || (plant.technology_type || '').includes('Gasification') || (plant.technology_type || '').includes('RDF');
+                        const isCompost = (plant.technology_type || '').includes('Compost') || (plant.technology_type || '').includes('Biomethanation');
+                        const isRecycle = (plant.technology_type || '').includes('Recycl');
+
+                        if (mapFilter === 'wte' && !isWte) return;
+                        if (mapFilter === 'compost' && !isCompost) return;
+                        if (mapFilter === 'recycling' && !isRecycle) return;
+
+                        let colorBg = isCompost ? 'bg-emerald-600 shadow-emerald-600/60' : (isRecycle ? 'bg-sky-600 shadow-sky-600/60' : 'bg-amber-600 shadow-amber-600/60');
+                        let iconLetter = isCompost ? '🌱' : (isRecycle ? '♻️' : '⚡');
+
+                        const plantIcon = L.divIcon({
+                            html: `<div class="marker-pulse w-9 h-9 rounded-full ${colorBg} border-2 border-white flex items-center justify-center shadow-xl cursor-pointer hover:scale-110 transition-transform"><span class="text-xs font-bold text-white">${iconLetter}</span></div>`,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 18]
+                        });
+
+                        const popupHtml = `
+                            <div class="p-3.5 font-sans min-w-[250px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
+                                <div class="font-bold text-xs text-white uppercase border-b border-zinc-800 pb-2 mb-2">${plant.name}</div>
+                                <div class="space-y-1 text-[11px] text-zinc-300">
+                                    <div class="flex justify-between"><span>Type:</span> <strong class="text-emerald-400">${plant.technology_type}</strong></div>
+                                    <div class="flex justify-between"><span>Capacity:</span> <strong class="text-white">${plant.capacity} Tons/day</strong></div>
+                                    <div class="flex justify-between"><span>Current Utilization:</span> <strong class="text-amber-400">${plant.utilization} Tons (${plant.utilization_pct}%)</strong></div>
+                                    <div class="flex justify-between"><span>Heat Recovery:</span> <strong class="text-purple-300">${plant.recovered_heat_mw} MW</strong></div>
+                                    <div class="flex justify-between"><span>Trucks in Queue:</span> <strong class="text-sky-300">${plant.queue_length} Vehicles</strong></div>
+                                </div>
+                            </div>
+                        `;
+                        L.marker([plant.lat, plant.lng], { icon: plantIcon }).bindPopup(popupHtml).addTo(mapMarkersGroup.current);
+                    });
+                }
+
+                // 2. Render Transfer Stations
+                if (mapFilter === 'all' || mapFilter === 'transfer') {
+                    transferStations.forEach(st => {
+                        const stIcon = L.divIcon({
+                            html: `<div class="w-8 h-8 rounded-xl bg-purple-600 border-2 border-white flex items-center justify-center shadow-lg shadow-purple-600/40 cursor-pointer hover:scale-110 transition-transform"><span class="text-xs font-bold text-white">📦</span></div>`,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 16]
+                        });
+
+                        const popupHtml = `
+                            <div class="p-3 font-sans min-w-[230px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
+                                <div class="font-bold text-xs text-purple-300 uppercase border-b border-zinc-800 pb-2 mb-2">📦 ${st.name}</div>
+                                <div class="space-y-1 text-[11px] text-zinc-300">
+                                    <div class="flex justify-between"><span>Queued Payload:</span> <strong class="text-white">${st.weight}</strong></div>
+                                    <div class="flex justify-between"><span>Organic Share:</span> <strong class="text-emerald-400">${st.org}</strong></div>
+                                    <div class="flex justify-between"><span>Recyclable Share:</span> <strong class="text-sky-400">${st.rec}</strong></div>
+                                </div>
+                            </div>
+                        `;
+                        L.marker([st.lat, st.lng], { icon: stIcon }).bindPopup(popupHtml).addTo(mapMarkersGroup.current);
+                    });
+                }
+
+                // 3. Render Real Waste Batch Trucks
+                if ((mapFilter === 'all' || mapFilter === 'fleet') && summary.trucks) {
+                    const filteredTrucks = summary.trucks.filter(t => {
+                        if (!truckSearchQuery) return true;
+                        const q = truckSearchQuery.toLowerCase();
+                        const reg = (t.registration_number || '').toLowerCase();
+                        const plant = (t.assigned_plant_name || '').toLowerCase();
+                        const bId = String((t.batch && t.batch.batch_id) || '');
+                        return reg.includes(q) || plant.includes(q) || bId.includes(q);
+                    });
+
+                    filteredTrucks.forEach((truck) => {
+                        const truckIcon = L.divIcon({
+                            html: `<div class="truck-leaflet-pin w-9 h-9"><span class="text-sm">🚛</span></div>`,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 18]
+                        });
+
+                        const popupHtml = `
+                            <div class="p-3.5 font-sans min-w-[270px] bg-zinc-950 text-white rounded-xl border border-zinc-800 shadow-2xl">
+                                <div class="flex items-center justify-between border-b border-zinc-800 pb-2 mb-2">
+                                    <span class="font-mono font-bold text-xs text-[#e73213]">🚛 ${truck.registration_number}</span>
+                                    <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">${truck.route_status}</span>
+                                </div>
+                                <div class="space-y-1.5 text-[11px] text-zinc-300">
+                                    <div class="flex justify-between"><span>Driver:</span> <strong class="text-white">${truck.driver_name}</strong></div>
+                                    <div class="flex justify-between"><span>Road Speed:</span> <strong class="text-sky-300">${truck.speed_kmh} km/h</strong></div>
+                                    <div class="flex justify-between"><span>Destination Facility:</span> <strong class="text-emerald-300">${truck.assigned_plant_name}</strong></div>
+                                    <div class="mt-2 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800">
+                                        <div class="font-bold text-white mb-1 flex justify-between">
+                                            <span>📦 Payload Weight:</span> 
+                                            <span class="text-emerald-400 font-mono">${truck.current_load} Tons</span>
+                                        </div>
+                                        <div class="text-[10px] text-zinc-400">
+                                            Moisture: <span class="text-sky-300">${(truck.batch && truck.batch.moisture_pct) || 45}%</span> &bull; 
+                                            Organic: <span class="text-emerald-300">${(truck.batch && truck.batch.organic_pct) || 60}%</span> &bull; 
+                                            Recyclable: <span class="text-amber-300">${(truck.batch && truck.batch.recyclable_pct) || 30}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        const marker = L.marker([truck.lat, truck.lng], { icon: truckIcon }).bindPopup(popupHtml).addTo(mapMarkersGroup.current);
+                        marker.on('click', () => setSelectedTruck(truck));
+
+                        // Route vector polyline
+                        if (truck.destination_lat && truck.destination_lng) {
+                            const polyline = L.polyline([[truck.lat, truck.lng], [truck.destination_lat, truck.destination_lng]], {
+                                color: '#e73213',
+                                weight: 3,
+                                opacity: 0.85,
+                                className: 'route-flow-line'
+                            });
+                            polyline.bindTooltip(`Route: ${truck.registration_number} → ${truck.assigned_plant_name}`, { sticky: true });
+                            polyline.addTo(mapRoutesGroup.current);
+                        }
+                    });
+                }
+            };
+
+            const focusTruck = (truck) => {
+                setSelectedTruck(truck);
+                if (mapInstance.current) {
+                    mapInstance.current.flyTo([truck.lat, truck.lng], 14, { duration: 1.2 });
+                }
+            };
+
+            const fitMapBounds = () => {
+                if (!summary || !mapInstance.current) return;
+                const bounds = L.latLngBounds([]);
+                if (summary.plants) summary.plants.forEach(p => bounds.extend([p.lat, p.lng]));
+                if (summary.trucks) summary.trucks.forEach(t => bounds.extend([t.lat, t.lng]));
+                if (bounds.isValid()) mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
             };
 
             const runSimulation = async () => {
@@ -554,27 +592,28 @@
             return (
                 <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
                     
+                    {/* Top Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-glassBorder pb-5 gap-4">
                         <div>
                             <div className="flex items-center gap-2">
                                 <h1 className="text-xl font-bold text-paletteCream tracking-tight uppercase">SmartWasteAI Operations Engine</h1>
                                 <span className="bg-[#e73213]/20 text-[#e73213] text-[10px] font-bold px-2.5 py-0.5 rounded border border-[#e73213]/40">CHENNAI ULB LIVE TWIN</span>
                             </div>
-                            <p className="text-xs text-[#9dbeb7] mt-1">Autonomous Sensor Fusion Intake, Cross-ULB Waste Matching Engine & Cryptographic MRV Ledger</p>
+                            <p className="text-xs text-[#9dbeb7] mt-1">Full Road-Level Fleet Tracking &bull; Real-Time Sensor Fusion Conveyor AI</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                             <button onClick={() => toggleCameraMode()} className="bg-[#14181d] hover:bg-zinc-800 text-[#efe6d5] font-bold text-xs px-3.5 py-2 rounded-xl border border-glassBorder transition flex items-center gap-2">
                                 <span className={`w-2.5 h-2.5 rounded-full ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] animate-pulse' : 'bg-[#e73213]'}`}></span>
-                                Camera: {cameraMode === 'simulation' ? 'Simulation Mode' : 'Hardware Mode'}
+                                Camera: {cameraMode === 'simulation' ? 'Simulation' : `Cam ${cameraIdx} (Hardware)`}
                             </button>
                             <button onClick={runSimulation} disabled={simulating} className="bg-[#e73213] hover:bg-[#c8290e] text-white font-bold text-xs px-4 py-2 rounded-xl border border-[#e73213] transition flex items-center gap-2 shadow-lg shadow-[#e73213]/30 disabled:opacity-50">
                                 <Icon name="zap" className="w-4 h-4" />
-                                {simulating ? "Simulating System..." : "Simulate Cross-ULB Matching & Conveyor"}
+                                {simulating ? "Simulating..." : "Simulate Intake & Optimization"}
                             </button>
                         </div>
                     </div>
 
-                    
+                    {/* KPI Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="info-panel p-4 rounded-2xl">
                             <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Unallocated Batches</span>
@@ -582,12 +621,12 @@
                             <span className="text-[10px] text-[#efe6d5]/70 font-medium">In Transfer Station Queue</span>
                         </div>
                         <div className="info-panel p-4 rounded-2xl">
-                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Active Fleet Count</span>
+                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Active Waste Trucks</span>
                             <div className="text-2xl font-bold text-[#efe6d5] mt-1">{(summary && summary.trucks && summary.trucks.length) || 0}</div>
                             <span className="text-[10px] text-[#9dbeb7] font-medium">GPS Telemetry Tracked</span>
                         </div>
                         <div className="info-panel p-4 rounded-2xl">
-                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Treatment Plants</span>
+                            <span className="text-[10px] font-semibold text-[#9dbeb7] uppercase tracking-wider">Treatment Facilities</span>
                             <div className="text-2xl font-bold text-[#9dbeb7] mt-1">{(summary && summary.plants && summary.plants.length) || 0}</div>
                             <span className="text-[10px] text-[#9dbeb7]/80 font-medium">Compost / Bio-CNG / WtE</span>
                         </div>
@@ -598,14 +637,14 @@
                         </div>
                     </div>
 
-                    
+                    {/* Main Tabs Container */}
                     <div className="info-panel p-5 rounded-2xl bg-[#14181d] border border-glassBorder">
                         <div className="flex border-b border-glassBorder mb-4 gap-4 overflow-x-auto custom-scrollbar pb-1">
                             <button onClick={() => setActiveTab('batches')} className={activeTab === 'batches' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#e73213] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Unallocated Batches ({unallocated.length})
                             </button>
                             <button onClick={() => setActiveTab('transit')} className={activeTab === 'transit' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#9dbeb7] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
-                                Sensor Fusion Conveyor (Live)
+                                📹 Conveyor Belt & Live Webcam (YOLO11s)
                             </button>
                             <button onClick={() => setActiveTab('db_viewer')} className={activeTab === 'db_viewer' ? "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-[#9dbeb7] text-[#efe6d5]" : "pb-2.5 text-xs font-bold uppercase border-b-2 border-b-transparent text-[#9dbeb7]/60 hover:text-[#efe6d5]"}>
                                 Database Viewer
@@ -621,7 +660,7 @@
                             </button>
                         </div>
 
-                        
+                        {/* TAB 1: Batches */}
                         {activeTab === 'batches' && (
                             <div className="overflow-x-auto custom-scrollbar max-h-64">
                                 {unallocated.length === 0 ? (
@@ -657,83 +696,74 @@
                             </div>
                         )}
 
-                        
+                        {/* TAB 2: Conveyor Belt & Live Webcam */}
                         {activeTab === 'transit' && (
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-glassBorder/40 pb-3 gap-3">
                                     <div>
                                         <h3 className="text-xs font-bold text-[#efe6d5] uppercase flex items-center gap-2">
-                                            <Icon name="activity" className="w-4 h-4 text-[#e73213]" />
-                                            Sensor Fusion Conveyor Intake Stream (Camera + NIR & Metal Sensors)
+                                            <Icon name="camera" className="w-4 h-4 text-[#e73213]" />
+                                            Live Conveyor Belt Segregation Feed (YOLO11s Vision AI)
                                         </h3>
-                                        <p className="text-[11px] text-[#9dbeb7] mt-0.5">Physical Pipeline: Bag Opener &rarr; Trommel Size Screen &rarr; Sensor Belt (Coarse Triage)</p>
+                                        <p className="text-[11px] text-[#9dbeb7] mt-0.5">Automated Real-time Triage: Wet (Organic) &bull; Dry (RDF) &bull; Recyclable (MRF)</p>
                                     </div>
-                                    <button onClick={() => setTransitLiveMode(!transitLiveMode)} className="text-[10px] font-bold uppercase px-3 py-1 rounded-lg bg-[#0d0f12] border border-glassBorder text-[#9dbeb7]">
-                                        {transitLiveMode ? "Pause Feed" : "Resume Feed"}
-                                    </button>
-                                </div>
-
-                                
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] font-bold">
-                                    <div className="bg-[#0d0f12] p-3 rounded-xl border border-glassBorder flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-[#e73213]/20 text-[#e73213] flex items-center justify-center font-bold">1</span>
-                                        <div>
-                                            <div className="text-[#efe6d5]">Pre-Processing Stage</div>
-                                            <div className="text-[10px] text-[#9dbeb7]">Bag Opener & Trommel Screen</div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-[#0d0f12] p-3 rounded-xl border border-glassBorder flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-[#9dbeb7]/20 text-[#9dbeb7] flex items-center justify-center font-bold">2</span>
-                                        <div>
-                                            <div className="text-[#efe6d5]">Sensor Fusion Layer</div>
-                                            <div className="text-[10px] text-[#9dbeb7]">Camera + NIR & Metal Sensors</div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-[#0d0f12] p-3 rounded-xl border border-glassBorder flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">3</span>
-                                        <div>
-                                            <div className="text-[#efe6d5]">Pneumatic Triage</div>
-                                            <div className="text-[10px] text-[#9dbeb7]">Wet / Dry / Recyclable Bins</div>
-                                        </div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setFeedTimestamp(Date.now())} className="text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg bg-[#0d0f12] border border-glassBorder text-[#9dbeb7] hover:text-[#efe6d5] flex items-center gap-1.5">
+                                            <Icon name="refresh" className="w-3 h-3" /> Refresh Feed
+                                        </button>
+                                        <button onClick={() => setTransitLiveMode(!transitLiveMode)} className="text-[10px] font-bold uppercase px-3 py-1.5 rounded-lg bg-[#0d0f12] border border-glassBorder text-[#9dbeb7]">
+                                            {transitLiveMode ? "Pause Telemetry" : "Resume Telemetry"}
+                                        </button>
                                     </div>
                                 </div>
 
-                                <div className="w-full max-w-4xl mx-auto relative rounded-2xl border-2 border-[#9dbeb7]/30 bg-[#0d0f12] overflow-hidden shadow-2xl flex items-center justify-center min-h-[380px]">
-                                    <img src="/video_feed" className="w-full max-h-[420px] object-contain rounded-xl bg-black" alt="Live Transit Edge Sensor Fusion Feed" />
-                                    <div className="absolute top-3 right-3 bg-[#0d0f12]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#9dbeb7]/40 text-xs font-mono text-[#9dbeb7] flex items-center gap-2 shadow-lg">
-                                        <span className={`w-2.5 h-2.5 rounded-full ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] animate-ping' : 'bg-[#e73213] animate-pulse'}`}></span>
-                                        <span className="font-bold">{cameraMode === 'simulation' ? 'SIMULATED SENSOR FUSION FEED' : 'LIVE HARDWARE FEED'}</span>
+                                {/* Video Feed Frame */}
+                                <div className="w-full max-w-4xl mx-auto relative rounded-2xl border-2 border-[#9dbeb7]/40 bg-[#0d0f12] overflow-hidden shadow-2xl flex items-center justify-center min-h-[380px]">
+                                    <img 
+                                        key={feedTimestamp} 
+                                        src={`/video_feed?t=${feedTimestamp}`} 
+                                        className="w-full max-h-[440px] object-contain rounded-xl bg-black" 
+                                        alt="Conveyor Belt Stream"
+                                    />
+                                    <div className="absolute top-3 right-3 bg-[#0d0f12]/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#9dbeb7]/40 text-xs font-mono text-[#9dbeb7] flex items-center gap-2 shadow-lg">
+                                        <span className={`w-2.5 h-2.5 rounded-full ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] animate-pulse' : 'bg-[#e73213] animate-pulse'}`}></span>
+                                        <span className="font-bold">
+                                            {cameraMode === 'simulation' ? 'SIMULATED CONVEYOR TWIN' : `LIVE HARDWARE WEBCAM (CAM ${cameraIdx})`}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="flex flex-col sm:flex-row items-center justify-between bg-[#0d0f12]/60 p-3.5 rounded-xl border border-glassBorder gap-3">
-                                    <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-[#efe6d5]">
-                                            {cameraMode === 'simulation' 
-                                                ? "Camera Mode: Simulated Conveyor Digital Twin" 
-                                                : `Camera Mode: Live Hardware Webcam (Index ${cameraIdx})`}
-                                        </span>
-                                        <span className="text-[11px] text-[#9dbeb7] mt-0.5">
-                                            {cameraMode === 'simulation' 
-                                                ? "Streaming animated conveyor belt with real-time Sensor Fusion triage & DB logging." 
-                                                : cameraIdx === 1 ? "Connected to USB2.0 External PC Webcam (Index 1)." : "Connected to Integrated Laptop Camera (Index 0)."}
-                                        </span>
+
+                                {/* Camera Control Bar */}
+                                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between bg-[#0d0f12]/80 p-4 rounded-xl border border-glassBorder gap-4">
+                                    <div>
+                                        <div className="text-xs font-bold text-[#efe6d5] flex items-center gap-2">
+                                            <span>Active Source:</span>
+                                            <span className="text-[#e73213] font-mono">
+                                                {cameraMode === 'simulation' ? 'Digital Simulation Twin' : `Hardware Camera #${cameraIdx} (Active)`}
+                                            </span>
+                                        </div>
+                                        <div className="text-[11px] text-[#9dbeb7] mt-0.5">
+                                            Detected Webcams: {availableWebcams.length > 0 ? availableWebcams.map(w => `${w.name} (Index ${w.index})`).join(', ') : "Integrated Camera (Index 0)"}
+                                        </div>
                                     </div>
+
+                                    {/* Quick Camera Buttons */}
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <button onClick={() => toggleCameraMode('hardware', 1)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'hardware' && cameraIdx === 1 ? 'bg-[#e73213] border-[#e73213] text-white' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
-                                            USB Webcam (Cam 1)
-                                        </button>
                                         <button onClick={() => toggleCameraMode('hardware', 0)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'hardware' && cameraIdx === 0 ? 'bg-[#e73213] border-[#e73213] text-white' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
-                                            Laptop Cam (Cam 0)
+                                            📷 Cam 0 (Integrated)
                                         </button>
-                                        <button onClick={() => toggleCameraMode('simulation')} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] border-[#9dbeb7] text-[#0d0f12]' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
-                                            Simulation Mode
+                                        <button onClick={() => toggleCameraMode('hardware', 1)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'hardware' && cameraIdx === 1 ? 'bg-[#e73213] border-[#e73213] text-white' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
+                                            🔌 Cam 1 (USB)
+                                        </button>
+                                        <button onClick={() => toggleCameraMode('simulation')} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] border-[#9dbeb7] text-[#090b0e]' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
+                                            ⚙️ Simulation Mode
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        
+                        {/* TAB 3: Database Viewer */}
                         {activeTab === 'db_viewer' && (
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
@@ -742,7 +772,7 @@
                                         Live Database Viewer & Audit Ledger
                                     </h3>
                                     <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-500/30">
-                                        LIVE SYNC: {(dbDetections && dbDetections.last_synced) || "SYNCHRONIZED"}
+                                        LIVE SYNC
                                     </span>
                                 </div>
 
@@ -771,14 +801,13 @@
                                                     <th className="py-2.5 px-4">Class ID & Name</th>
                                                     <th className="py-2.5 px-4">Confidence %</th>
                                                     <th className="py-2.5 px-4">Mass (kg)</th>
-                                                    <th className="py-2.5 px-4">Camera ID</th>
                                                     <th className="py-2.5 px-4">Sorting Decision</th>
                                                     <th className="py-2.5 px-4">Timestamp</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-zinc-800/60 text-gray-300">
                                                 {(!dbDetections || !dbDetections.items || dbDetections.items.length === 0) ? (
-                                                    <tr><td colSpan="8" className="py-8 text-center text-gray-500 italic">No detections recorded in database query.</td></tr>
+                                                    <tr><td colSpan="7" className="py-8 text-center text-gray-500 italic">No detections recorded in database query.</td></tr>
                                                 ) : (
                                                     dbDetections.items.map(item => (
                                                         <tr key={item.id} className="hover:bg-white/[0.02]">
@@ -791,7 +820,6 @@
                                                             </td>
                                                             <td className="py-2.5 px-4 font-mono text-purple-300">{(item.confidence * 100).toFixed(1)}%</td>
                                                             <td className="py-2.5 px-4 font-mono">{item.item_weight_kg} kg</td>
-                                                            <td className="py-2.5 px-4 font-mono text-gray-400">{item.camera_id}</td>
                                                             <td className="py-2.5 px-4 font-bold text-white">{item.sorting_decision}</td>
                                                             <td className="py-2.5 px-4 font-mono text-[11px] text-gray-500">{item.timestamp}</td>
                                                         </tr>
@@ -804,7 +832,7 @@
                             </div>
                         )}
 
-                        
+                        {/* TAB 4: Cross-ULB Matching */}
                         {activeTab === 'matching' && (
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
@@ -833,7 +861,7 @@
                                                         <strong className="text-white">{item.matched_facility_name || "Landfill Fallback"}</strong>
                                                     </div>
                                                     <div className="flex justify-between text-[#9dbeb7]">
-                                                        <span>Transit Factor / Dist:</span>
+                                                        <span>Transit Distance:</span>
                                                         <strong className="text-sky-300">{item.distance_or_cost_factor} km</strong>
                                                     </div>
                                                     <div className="text-[11px] text-[#efe6d5]/70 italic mt-1 bg-[#14181d] p-2 rounded-lg border border-glassBorder">
@@ -847,7 +875,7 @@
                             </div>
                         )}
 
-                        
+                        {/* TAB 5: Diversion Metrics */}
                         {activeTab === 'diversion' && (
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center border-b border-glassBorder/40 pb-3">
@@ -878,7 +906,8 @@
                                 </div>
                             </div>
                         )}
-                        
+
+                        {/* TAB 6: Carbon Impact & MRV */}
                         {activeTab === 'mrv' && (
                             <div className="space-y-6">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-glassBorder/40 pb-3 gap-3">
@@ -891,7 +920,7 @@
                                     </div>
                                     <a href="/api/mrv/export" target="_blank" className="bg-[#e73213] hover:bg-[#c8290e] text-white text-xs font-bold px-4 py-2 rounded-xl border border-[#e73213] shadow-lg shadow-[#e73213]/30 transition inline-flex items-center gap-2">
                                         <Icon name="zap" className="w-3.5 h-3.5" />
-                                        Export Auditor-Ready MRV Report (CSV)
+                                        Export MRV Report (CSV)
                                     </a>
                                 </div>
 
@@ -912,108 +941,101 @@
                                         <div className="text-[9px] text-emerald-300 mt-1">SHA-256 Hash Chain Verified</div>
                                     </div>
                                 </div>
-
-                                <div className="space-y-3">
-                                    <h4 className="text-xs font-bold text-[#efe6d5] uppercase tracking-wider">Tamper-Evident Intake & MRV Audit Ledger</h4>
-                                    <div className="overflow-x-auto rounded-xl border border-glassBorder bg-[#0d0f12]/80 max-h-72 custom-scrollbar">
-                                        <table className="w-full text-left text-xs border-collapse">
-                                            <thead>
-                                                <tr className="border-b border-glassBorder text-[#9dbeb7] uppercase font-semibold text-[10px] bg-[#14181d]">
-                                                    <th className="py-2.5 px-3">Entry ID</th>
-                                                    <th className="py-2.5 px-3">Type</th>
-                                                    <th className="py-2.5 px-3">Metadata Info</th>
-                                                    <th className="py-2.5 px-3">Payload SHA-256</th>
-                                                    <th className="py-2.5 px-3">Previous Ledger Hash</th>
-                                                    <th className="py-2.5 px-3">Current Ledger Hash</th>
-                                                    <th className="py-2.5 px-3">Timestamp</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-zinc-800/60 text-[#efe6d5]">
-                                                {(!mrvData || !mrvData.cryptographic_ledger || mrvData.cryptographic_ledger.length === 0) ? (
-                                                    <tr><td colSpan="7" className="py-8 text-center text-gray-500 italic">No ledger entries recorded.</td></tr>
-                                                ) : (
-                                                    mrvData.cryptographic_ledger.map(entry => (
-                                                        <tr key={entry.entry_id} className="hover:bg-white/[0.02] font-mono text-[11px]">
-                                                            <td className="py-2.5 px-3 text-[#9dbeb7]">#{entry.entry_id}</td>
-                                                            <td className="py-2.5 px-3">
-                                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${entry.entry_type === 'MRV_RECORD' ? 'bg-[#e73213]/20 text-[#e73213] border-[#e73213]/40' : (entry.entry_type === 'ROUTING' ? 'bg-[#9dbeb7]/20 text-[#9dbeb7] border-[#9dbeb7]/40' : 'bg-zinc-800 text-gray-300 border-zinc-700')}`}>
-                                                                    {entry.entry_type}
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-2.5 px-3 text-white font-sans text-xs">{entry.metadata_info}</td>
-                                                            <td className="py-2.5 px-3 text-zinc-400 font-mono text-[10px]">{entry.payload_hash ? entry.payload_hash.substring(0, 12) + "..." : "N/A"}</td>
-                                                            <td className="py-2.5 px-3 text-zinc-500 font-mono text-[10px]">{entry.previous_hash ? entry.previous_hash.substring(0, 12) + "..." : "GENESIS"}</td>
-                                                            <td className="py-2.5 px-3 text-emerald-400 font-mono text-[10px]">{entry.current_hash ? entry.current_hash.substring(0, 12) + "..." : "N/A"}</td>
-                                                            <td className="py-2.5 px-3 text-zinc-500 text-[10px]">{entry.timestamp}</td>
-                                                        </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
                             </div>
                         )}
                     </div>
 
+                    {/* FULL ROAD VIEW & FLEET TRACKING SECTION */}
                     <div className="info-panel p-5 rounded-2xl bg-[#14181d] border border-glassBorder space-y-4">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-glassBorder pb-3">
                             <div>
                                 <h2 className="text-xs font-bold uppercase tracking-wider text-[#efe6d5] flex items-center gap-2">
                                     <Icon name="map-pin" className="w-4 h-4 text-[#e73213]" />
-                                    Smart City GIS Digital Twin Map (Chennai ULB Case Study)
+                                    Full Road-Level Waste Logistics & Fleet Tracking Map
                                 </h2>
-                                <p className="text-[11px] text-[#9dbeb7] mt-0.5">100% Open Access Maps (Zero API Keys) &bull; Live Fleet & Treatment Facility Telemetry</p>
+                                <p className="text-[11px] text-[#9dbeb7] mt-0.5">
+                                    Detailed Street & Highway Network &bull; Real-Time Waste Batch Truck Telemetry & Route Vectors
+                                </p>
                             </div>
                             
-                            
                             <div className="flex items-center gap-2 flex-wrap">
-                                
+                                {/* Map Style Switcher */}
                                 <div className="flex bg-[#0d0f12] p-1 rounded-xl border border-glassBorder text-[11px]">
-                                    <button onClick={() => switchMapStyle('cartoDark')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'cartoDark' ? 'bg-[#e73213] text-white shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
-                                        🌙 Dark
+                                    <button onClick={() => switchMapStyle('osmRoad')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyleKey === 'osmRoad' ? 'bg-[#e73213] text-white shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
+                                        🗺️ Full Road View
                                     </button>
-                                    <button onClick={() => switchMapStyle('esriSatellite')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'esriSatellite' ? 'bg-[#9dbeb7] text-[#0d0f12] shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
+                                    <button onClick={() => switchMapStyle('esriRoad')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyleKey === 'esriRoad' ? 'bg-[#e73213] text-white shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
+                                        🛣️ Highway GIS
+                                    </button>
+                                    <button onClick={() => switchMapStyle('esriSatellite')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyleKey === 'esriSatellite' ? 'bg-[#9dbeb7] text-[#090b0e] shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
                                         🛰️ Satellite
                                     </button>
-                                    <button onClick={() => switchMapStyle('osmStandard')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyle === 'osmStandard' ? 'bg-[#efe6d5] text-[#0d0f12] shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
-                                        🗺️ Street
+                                    <button onClick={() => switchMapStyle('cartoVoyager')} className={`px-2.5 py-1 rounded-lg font-bold transition ${mapStyleKey === 'cartoVoyager' ? 'bg-[#efe6d5] text-[#090b0e] shadow' : 'text-[#9dbeb7] hover:text-[#efe6d5]'}`}>
+                                        🧭 City View
                                     </button>
                                 </div>
-                                
+
                                 <button onClick={fitMapBounds} className="bg-[#0d0f12] hover:bg-zinc-800 text-[#efe6d5] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-glassBorder transition">
                                     Fit All Markers
                                 </button>
-                                <button onClick={focusLiveEdge} className="bg-[#e73213]/20 hover:bg-[#e73213]/40 text-[#e73213] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#e73213]/40 transition">
-                                    Focus Live Edge
-                                </button>
                             </div>
                         </div>
 
-                        
+                        {/* Search & Find Real Waste Batch Trucks Bar */}
+                        <div className="flex flex-col sm:flex-row items-center gap-3 bg-[#0d0f12] p-3 rounded-xl border border-glassBorder">
+                            <div className="relative flex-1 w-full">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Icon name="search" className="w-4 h-4 text-[#9dbeb7]" />
+                                </div>
+                                <input 
+                                    type="text" 
+                                    value={truckSearchQuery} 
+                                    onChange={(e) => setTruckSearchQuery(e.target.value)}
+                                    placeholder="🔍 Search Waste Batch Truck by Plate (e.g. TN-01), Batch ID, or Destination..." 
+                                    className="w-full pl-9 pr-4 py-2 bg-[#14181d] border border-glassBorder rounded-xl text-xs text-[#efe6d5] focus:outline-none focus:border-[#e73213]"
+                                />
+                            </div>
+
+                            {/* Quick Truck Select Pills */}
+                            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar w-full sm:w-auto">
+                                {summary && summary.trucks && summary.trucks.slice(0, 5).map(t => (
+                                    <button 
+                                        key={t.id} 
+                                        onClick={() => focusTruck(t)}
+                                        className={`px-2.5 py-1.5 rounded-lg font-mono text-[10px] font-bold whitespace-nowrap transition border ${selectedTruck && selectedTruck.id === t.id ? 'bg-[#e73213] text-white border-[#e73213]' : 'bg-[#14181d] text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}
+                                    >
+                                        🚛 {t.registration_number}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Filter Bar */}
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[11px] font-bold">
-                            <button onClick={() => setMapFilter('all')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'all' ? 'bg-[#efe6d5] text-[#0d0f12] border-[#efe6d5] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
+                            <button onClick={() => setMapFilter('all')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'all' ? 'bg-[#efe6d5] text-[#090b0e] border-[#efe6d5] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 All Locations
                             </button>
-                            <button onClick={() => setMapFilter('wte')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'wte' ? 'bg-[#e73213] text-white border-[#e73213] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
+                            <button onClick={() => setMapFilter('fleet')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'fleet' ? 'bg-[#e73213] text-white border-[#e73213] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
+                                🚛 Active Fleet Trucks
+                            </button>
+                            <button onClick={() => setMapFilter('wte')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'wte' ? 'bg-[#f59e0b] text-[#090b0e] border-[#f59e0b] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 ⚡ WtE & Gasification
                             </button>
-                            <button onClick={() => setMapFilter('compost')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'compost' ? 'bg-[#9dbeb7] text-[#0d0f12] border-[#9dbeb7] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
+                            <button onClick={() => setMapFilter('compost')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'compost' ? 'bg-[#10b981] text-[#090b0e] border-[#10b981] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 🌱 Composting & Bio-CNG
                             </button>
-                            <button onClick={() => setMapFilter('recycling')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'recycling' ? 'bg-[#efe6d5] text-[#0d0f12] border-[#efe6d5] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
+                            <button onClick={() => setMapFilter('recycling')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'recycling' ? 'bg-[#38bdf8] text-[#090b0e] border-[#38bdf8] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 ♻️ Recycling Plants
                             </button>
-                            <button onClick={() => setMapFilter('transfer')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'transfer' ? 'bg-[#9dbeb7] text-[#0d0f12] border-[#9dbeb7] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
+                            <button onClick={() => setMapFilter('transfer')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'transfer' ? 'bg-[#a855f7] text-white border-[#a855f7] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
                                 📦 Transfer Hubs
-                            </button>
-                            <button onClick={() => setMapFilter('fleet')} className={`px-3 py-1.5 rounded-xl border transition ${mapFilter === 'fleet' ? 'bg-[#e73213] text-white border-[#e73213] shadow' : 'bg-[#0d0f12]/80 text-[#9dbeb7] border-glassBorder hover:text-[#efe6d5]'}`}>
-                                🚛 Active Fleet
                             </button>
                         </div>
 
-                        <div ref={mapContainerRef} className="flex-1 rounded-xl border border-glassBorder overflow-hidden shadow-2xl" style={{ height: '420px', width: '100%' }}></div>
+                        {/* Map Container */}
+                        <div ref={mapContainerRef} className="flex-1 rounded-xl border border-glassBorder overflow-hidden shadow-2xl" style={{ height: '460px', width: '100%' }}></div>
                     </div>
+
                 </div>
             );
         };

@@ -17,12 +17,48 @@ def get_configured_camera_index():
         except Exception:
             pass
     env_idx = os.getenv("CAMERA_INDEX")
-    if env_idx:
+    if env_idx is not None and env_idx != "":
         try:
             return int(env_idx)
         except Exception:
             pass
-    return 1  # Default to 1 (USB Webcam)
+    return 0  # Default to 0 (Integrated Camera or first available)
+
+def detect_connected_webcams():
+    """Probes indices 0, 1, 2 to find working video cameras."""
+    found = []
+    for idx in range(3):
+        try:
+            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    h, w = frame.shape[:2]
+                    name = "Integrated Camera" if idx == 0 else f"USB Webcam #{idx}"
+                    found.append({
+                        "index": idx,
+                        "name": name,
+                        "resolution": f"{w}x{h}",
+                        "active": True
+                    })
+                cap.release()
+            else:
+                # Try default backend if DSHOW fails
+                cap_def = cv2.VideoCapture(idx)
+                if cap_def.isOpened():
+                    ret, frame = cap_def.read()
+                    if ret and frame is not None:
+                        h, w = frame.shape[:2]
+                        found.append({
+                            "index": idx,
+                            "name": f"Camera Device #{idx}",
+                            "resolution": f"{w}x{h}",
+                            "active": True
+                        })
+                    cap_def.release()
+        except Exception:
+            pass
+    return found
 
 class VideoCamera:
     _instance = None
@@ -35,7 +71,7 @@ class VideoCamera:
             cls._instance.init_camera(camera_index)
         return cls._instance
 
-    def init_camera(self, camera_index=1):
+    def init_camera(self, camera_index=0):
         self.camera_index = camera_index
         self.cap = None
         self.app = None
@@ -44,7 +80,7 @@ class VideoCamera:
         self.last_db_log_time = 0.0
         self.sim_tick = 0
         self.use_hardware_cam = False
-        self.force_simulation = True  # Default to simulation mode
+        self.force_simulation = False  # Start in hardware mode by default
 
         self.class_names = {0: 'wet', 1: 'dry', 2: 'recyclable'}
         self.class_colors = {
@@ -62,17 +98,22 @@ class VideoCamera:
         self.current_frame = self._generate_vibrant_conveyor_frame()
 
         # Load YOLO model for hardware mode
-        model_path = r'C:\Users\varun\OneDrive\Desktop\CSW\runs\SmartWasteGrid_YOLO11s_FT\weights\best.pt'
-        if not os.path.exists(model_path):
-            model_path = r'C:\Users\varun\OneDrive\Desktop\CSW\runs\SmartWasteGrid_YOLO11s\weights\best.pt'
-            
+        model_paths = [
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'runs', 'SmartWasteGrid_YOLO11s_FT', 'weights', 'best.pt'),
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'runs', 'SmartWasteGrid_YOLO11s', 'weights', 'best.pt'),
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'yolo11s.pt')
+        ]
+        
         self.model = None
-        try:
-            from ultralytics import YOLO
-            self.model = YOLO(model_path)
-            print(f"[*] Loaded YOLO model for live video feed from {model_path}")
-        except Exception as e:
-            print(f"[!] Warning loading YOLO model: {e}")
+        for mp in model_paths:
+            if os.path.exists(mp):
+                try:
+                    from ultralytics import YOLO
+                    self.model = YOLO(mp)
+                    print(f"[*] Loaded YOLO model for live video feed from {mp}")
+                    break
+                except Exception as e:
+                    print(f"[!] Warning loading YOLO model {mp}: {e}")
 
         # Thread 1: Fast Frame Capture Thread (30 FPS)
         self.capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
@@ -102,6 +143,12 @@ class VideoCamera:
                 except Exception:
                     pass
                 self.cap = None
+        else:
+            if self.cap is None or not self.cap.isOpened():
+                try:
+                    self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+                except Exception:
+                    pass
 
     def _generate_vibrant_conveyor_frame(self):
         self.sim_tick += 1
@@ -158,16 +205,24 @@ class VideoCamera:
                 if self.cap is None or not self.cap.isOpened():
                     try:
                         self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+                        if not self.cap.isOpened():
+                            self.cap = cv2.VideoCapture(self.camera_index)
                     except Exception:
                         pass
+                
                 if self.cap and self.cap.isOpened():
                     ret, frame = self.cap.read()
-                    if ret and frame is not None:
-                        brightness = float(np.mean(frame))
-                        if brightness > 25.0:  # Require active light level to treat as live webcam
-                            self.current_frame = frame
-                            self.use_hardware_cam = True
-                            success = True
+                    if ret and frame is not None and frame.size > 0:
+                        self.current_frame = frame
+                        self.use_hardware_cam = True
+                        success = True
+                    else:
+                        # Release invalid capture to allow re-initialization
+                        try:
+                            self.cap.release()
+                        except Exception:
+                            pass
+                        self.cap = None
             
             if not success:
                 self.use_hardware_cam = False
@@ -180,7 +235,7 @@ class VideoCamera:
             if self.use_hardware_cam and self.model is not None and self.current_frame is not None:
                 try:
                     frame_copy = self.current_frame.copy()
-                    results = self.model.predict(source=frame_copy, conf=0.35, verbose=False)
+                    results = self.model.predict(source=frame_copy, conf=0.28, verbose=False)
                     boxes_list = []
                     if results and len(results) > 0:
                         boxes = results[0].boxes
@@ -195,11 +250,11 @@ class VideoCamera:
                     self.current_boxes = boxes_list
                 except Exception:
                     pass
-            time.sleep(0.08)
+            time.sleep(0.06)
 
     def log_detection_to_db(self, cls_id, cname, conf):
         now = time.time()
-        if now - self.last_db_log_time < 3.0:
+        if now - self.last_db_log_time < 2.5:
             return  
         self.last_db_log_time = now
 
@@ -232,7 +287,7 @@ class VideoCamera:
                         confidence=float(conf),
                         sorting_decision=bin_decision,
                         item_weight_kg=item_weight,
-                        camera_id="LIVE_WEBCAM_EDGE_01",
+                        camera_id=f"LIVE_EDGE_CAM_{self.camera_index}",
                         timestamp=datetime.utcnow()
                     )
                     db.session.add(item)
@@ -241,7 +296,7 @@ class VideoCamera:
             pass
 
     def get_frame(self):
-        if not hasattr(self, 'current_frame') or self.current_frame is None or np.mean(self.current_frame) < 2.0:
+        if not hasattr(self, 'current_frame') or self.current_frame is None or np.mean(self.current_frame) < 1.0:
             self.current_frame = self._generate_vibrant_conveyor_frame()
 
         frame = self.current_frame.copy()
@@ -257,9 +312,13 @@ class VideoCamera:
                 cv2.putText(frame, label_str, (x1+5, max(15, y1-7)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-        ts = time.strftime("%Y-%m-%d %H:%M:%S")
-        cv2.putText(frame, f"TRANSIT EDGE CAM #1 | {ts}", (15, 460),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            cv2.putText(frame, f"LIVE WEBCAM #{self.camera_index} | YOLO11s ONLINE | {ts}", (15, 460),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        else:
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            cv2.putText(frame, f"SIMULATION DIGITAL TWIN | {ts}", (15, 460),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 200), 2)
 
         ret, jpeg = cv2.imencode('.jpg', frame)
         return jpeg.tobytes()

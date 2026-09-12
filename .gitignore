@@ -5,7 +5,11 @@ __pycache__/
 dataset/
 datasets/
 _sources/
-runs/
+# Ignore heavy training checkpoints, keep best/last weights
+runs/**/weights/epoch*.pt
+!runs/**/weights/best.pt
+!runs/**/weights/last.pt
+!yolo11s.pt
 reports/
 *.zip
 *.db

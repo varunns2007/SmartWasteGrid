@@ -205,15 +205,44 @@ class Truck(db.Model):
     lng = db.Column(db.Float, nullable=True)
 
     def to_dict(self):
+        plant = None
+        if self.assigned_plant_id:
+            plant = Facility.query.get(self.assigned_plant_id)
+        
+        latest_batch = WasteBatch.query.filter_by(truck_id=self.id).order_by(WasteBatch.id.desc()).first()
+        
+        batch_info = None
+        if latest_batch:
+            batch_info = {
+                'batch_id': latest_batch.id,
+                'weight_tons': round(float(latest_batch.weight_tons or 0.0), 2),
+                'organic_pct': round(float(latest_batch.organic_percentage or 0.0), 1),
+                'recyclable_pct': round(float(latest_batch.recyclable_percentage or 0.0), 1),
+                'moisture_pct': round(float(latest_batch.moisture_percentage or 0.0), 1),
+                'awvs_score': round(float(latest_batch.awvs_score or 0.0), 2) if latest_batch.awvs_score is not None else None,
+                'station': latest_batch.transfer_station_name or "Mylapore TS"
+            }
+
+        dest_name = plant.name if plant else ("Perungudi WtE Plant" if (self.id % 2 == 0) else "Madhavaram Bio-CNG")
+        dest_lat = plant.location_lat if plant else (12.9602 if (self.id % 2 == 0) else 13.1492)
+        dest_lng = plant.location_lng if plant else (80.2285 if (self.id % 2 == 0) else 80.2282)
+
         return {
             'id': self.id,
             'registration_number': self.registration_number,
             'capacity_tons': self.capacity_tons,
-            'current_load': self.current_load,
+            'current_load': self.current_load if self.current_load > 0 else (batch_info['weight_tons'] if batch_info else round(float(self.capacity_tons * 0.75), 1)),
             'assigned_plant_id': self.assigned_plant_id,
-            'route_status': self.route_status,
-            'lat': self.lat,
-            'lng': self.lng
+            'assigned_plant_name': dest_name,
+            'destination_lat': dest_lat,
+            'destination_lng': dest_lng,
+            'route_status': self.route_status or 'IN_TRANSIT',
+            'speed_kmh': 32 + (self.id * 3) % 18,
+            'fuel_level_pct': 72 + (self.id * 7) % 25,
+            'driver_name': f"Driver Unit #{self.id:02d} ({'S. Murugan' if self.id==1 else ('K. Ramesh' if self.id==2 else ('M. Arumugam' if self.id==3 else 'P. Selvam'))})",
+            'lat': self.lat or (13.0368 + (self.id * 0.015) - 0.03),
+            'lng': self.lng or (80.2676 + (self.id * 0.012) - 0.02),
+            'batch': batch_info
         }
 
 class RoutingDecision(db.Model):
