@@ -230,7 +230,11 @@ class VideoCamera:
                     elif self.cap and self.cap.isOpened():
                         ret, frame = self.cap.read()
                         if ret and frame is not None and frame.size > 0:
-                            frame_captured = frame
+                            # Verify frame is not an empty all-zero buffer from blocked DirectShow driver
+                            if np.mean(frame) > 1.5:
+                                frame_captured = frame
+                            else:
+                                frame_captured = None
                         else:
                             try:
                                 self.cap.release()
