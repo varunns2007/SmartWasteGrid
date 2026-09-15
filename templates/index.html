@@ -211,6 +211,11 @@
             const [cameraIdx, setCameraIdx] = useState(0);
             const [availableWebcams, setAvailableWebcams] = useState([]);
             const [isHardwareActive, setIsHardwareActive] = useState(false);
+            const [browserCamActive, setBrowserCamActive] = useState(false);
+            const [browserCamDetections, setBrowserCamDetections] = useState([]);
+            const browserVideoRef = useRef(null);
+            const browserCanvasRef = useRef(null);
+            const browserStreamRef = useRef(null);
 
             // Extension States
             const [dbSubTab, setDbSubTab] = useState('detections');
@@ -237,6 +242,34 @@
             const mapMarkersGroup = useRef(null);
             const mapRoutesGroup = useRef(null);
             const mapTileLayerRef = useRef(null);
+
+            const startBrowserWebcam = async () => {
+                setBrowserCamActive(true);
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+                        audio: false
+                    });
+                    browserStreamRef.current = stream;
+                    if (browserVideoRef.current) {
+                        browserVideoRef.current.srcObject = stream;
+                        browserVideoRef.current.play();
+                    }
+                } catch (err) {
+                    console.error("Browser camera access error:", err);
+                    alert("Could not access browser webcam: " + err.message + "\nPlease allow camera permissions in your browser address bar.");
+                    setBrowserCamActive(false);
+                }
+            };
+
+            const stopBrowserWebcam = () => {
+                if (browserStreamRef.current) {
+                    browserStreamRef.current.getTracks().forEach(track => track.stop());
+                    browserStreamRef.current = null;
+                }
+                setBrowserCamActive(false);
+                setBrowserCamDetections([]);
+            };
 
             const fetchWebcams = async () => {
                 try {
@@ -346,8 +379,69 @@
                 };
             }, [transitLiveMode, activeTab, activeTransitStation]);
 
+            useEffect(() => {
+                let intervalId = null;
+                if (browserCamActive && activeTab === 'transit') {
+                    const classifyBrowserFrame = async () => {
+                        const video = browserVideoRef.current;
+                        const canvas = browserCanvasRef.current;
+                        if (!video || !canvas || video.readyState < 2) return;
+
+                        canvas.width = video.videoWidth || 640;
+                        canvas.height = video.videoHeight || 480;
+                        const ctx = canvas.getContext('2d');
+
+                        const captureCanvas = document.createElement('canvas');
+                        captureCanvas.width = canvas.width;
+                        captureCanvas.height = canvas.height;
+                        const capCtx = captureCanvas.getContext('2d');
+                        capCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const b64Image = captureCanvas.toDataURL('image/jpeg', 0.85);
+
+                        try {
+                            const res = await fetch('/api/camera/classify_frame', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ image: b64Image, log_db: true })
+                            }).then(r => r.json());
+
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            if (res && res.detections && res.detections.length > 0) {
+                                setBrowserCamDetections(res.detections);
+                                res.detections.forEach(det => {
+                                    const [x1, y1, x2, y2] = det.box;
+                                    const colors = { 0: '#10b981', 1: '#f59e0b', 2: '#0ea5e9' };
+                                    const color = colors[det.class_id] || '#a855f7';
+
+                                    ctx.strokeStyle = color;
+                                    ctx.lineWidth = 3;
+                                    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+                                    ctx.fillStyle = color;
+                                    ctx.fillRect(x1, Math.max(0, y1 - 25), 180, 25);
+
+                                    ctx.fillStyle = '#ffffff';
+                                    ctx.font = 'bold 13px sans-serif';
+                                    ctx.fillText(`${det.class_id}:${det.class_name.toUpperCase()} ${(det.confidence * 100).toFixed(0)}%`, x1 + 6, Math.max(16, y1 - 7));
+                                });
+                            } else {
+                                setBrowserCamDetections([]);
+                            }
+                        } catch (err) {
+                            console.error("Browser AI classification error:", err);
+                        }
+                    };
+
+                    intervalId = setInterval(classifyBrowserFrame, 220);
+                }
+                return () => {
+                    if (intervalId) clearInterval(intervalId);
+                };
+            }, [browserCamActive, activeTab]);
+
             // Camera toggle
             const toggleCameraMode = async (newMode, targetIdx) => {
+                if (browserCamActive) stopBrowserWebcam();
                 const modeToSet = newMode || (cameraMode === 'simulation' ? 'hardware' : 'simulation');
                 const indexToSet = targetIdx !== undefined ? targetIdx : cameraIdx;
                 try {
@@ -732,17 +826,49 @@
 
                                 {/* Video Feed Frame */}
                                 <div className="w-full max-w-4xl mx-auto relative rounded-2xl border-2 border-[#9dbeb7]/40 bg-[#0d0f12] overflow-hidden shadow-2xl flex items-center justify-center min-h-[380px]">
-                                    <img 
-                                        key={feedTimestamp} 
-                                        src={`/video_feed?t=${feedTimestamp}`} 
-                                        className="w-full max-h-[440px] object-contain rounded-xl bg-black" 
-                                        alt="Conveyor Belt Stream"
-                                    />
+                                    {browserCamActive ? (
+                                        <div className="relative w-full h-full flex items-center justify-center">
+                                            <video 
+                                                ref={browserVideoRef} 
+                                                autoPlay 
+                                                playsInline 
+                                                muted 
+                                                className="w-full max-h-[440px] object-contain rounded-xl bg-black" 
+                                            />
+                                            <canvas 
+                                                ref={browserCanvasRef} 
+                                                className="absolute inset-0 w-full h-full pointer-events-none" 
+                                            />
+                                        </div>
+                                    ) : (
+                                        <img 
+                                            key={feedTimestamp} 
+                                            src={`/video_feed?t=${feedTimestamp}`} 
+                                            className="w-full max-h-[440px] object-contain rounded-xl bg-black" 
+                                            alt="Conveyor Belt Stream" 
+                                        />
+                                    )}
+
+                                    {/* Status Badge */}
                                     <div className="absolute top-3 right-3 bg-[#0d0f12]/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#9dbeb7]/40 text-xs font-mono text-[#9dbeb7] flex items-center gap-2 shadow-lg">
-                                        <span className={`w-2.5 h-2.5 rounded-full ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] animate-pulse' : 'bg-[#e73213] animate-pulse'}`}></span>
-                                        <span className="font-bold">
-                                            {cameraMode === 'simulation' ? 'SIMULATED CONVEYOR TWIN' : `LIVE HARDWARE WEBCAM (CAM ${cameraIdx})`}
-                                        </span>
+                                        {browserCamActive ? (
+                                            <>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                <span className="font-bold text-emerald-300">LIVE BROWSER WEBCAM (YOLO11s ON)</span>
+                                            </>
+                                        ) : isHardwareActive ? (
+                                            <>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-[#e73213] animate-pulse"></span>
+                                                <span className="font-bold text-[#efe6d5]">LIVE HARDWARE WEBCAM (CAM {cameraIdx})</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="w-2.5 h-2.5 rounded-full bg-[#9dbeb7] animate-pulse"></span>
+                                                <span className="font-bold text-[#9dbeb7]">
+                                                    {cameraMode === 'simulation' ? 'SIMULATED CONVEYOR TWIN' : `SIMULATION TWIN (Cam ${cameraIdx} Standby)`}
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -750,25 +876,41 @@
                                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between bg-[#0d0f12]/80 p-4 rounded-xl border border-glassBorder gap-4">
                                     <div>
                                         <div className="text-xs font-bold text-[#efe6d5] flex items-center gap-2">
-                                            <span>Active Source:</span>
+                                            <span>Active Stream:</span>
                                             <span className="text-[#e73213] font-mono">
-                                                {cameraMode === 'simulation' ? 'Digital Simulation Twin' : `Hardware Camera #${cameraIdx} (Active)`}
+                                                {browserCamActive ? "Browser HD Camera (WebRTC)" : (cameraMode === 'simulation' ? "Digital Simulation Twin" : `Server Camera #${cameraIdx} ${isHardwareActive ? '(Active)' : '(Standby)'}`)}
                                             </span>
                                         </div>
                                         <div className="text-[11px] text-[#9dbeb7] mt-0.5">
-                                            Detected Webcams: {availableWebcams.length > 0 ? availableWebcams.map(w => `${w.name} (Index ${w.index})`).join(', ') : "Integrated Camera (Index 0)"}
+                                            Hardware Cameras: {availableWebcams.length > 0 ? availableWebcams.map(w => `${w.name} (Index ${w.index})`).join(', ') : "Integrated Camera (Index 0)"}
                                         </div>
                                     </div>
 
                                     {/* Quick Camera Buttons */}
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <button onClick={() => toggleCameraMode('hardware', 0)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'hardware' && cameraIdx === 0 ? 'bg-[#e73213] border-[#e73213] text-white' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
-                                            📷 Cam 0 (Integrated)
+                                        <button 
+                                            onClick={startBrowserWebcam} 
+                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow flex items-center gap-1.5 ${browserCamActive ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-[#0d0f12] border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40'}`}
+                                            title="Use your browser's direct webcam stream with client-side YOLO AI"
+                                        >
+                                            🌐 Browser Webcam (Direct)
                                         </button>
-                                        <button onClick={() => toggleCameraMode('hardware', 1)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'hardware' && cameraIdx === 1 ? 'bg-[#e73213] border-[#e73213] text-white' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
-                                            🔌 Cam 1 (USB)
+                                        <button 
+                                            onClick={() => { stopBrowserWebcam(); toggleCameraMode('hardware', 0); }} 
+                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${!browserCamActive && cameraMode === 'hardware' && cameraIdx === 0 ? 'bg-[#e73213] border-[#e73213] text-white' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}
+                                        >
+                                            📷 Server Cam 0 (Built-in)
                                         </button>
-                                        <button onClick={() => toggleCameraMode('simulation')} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${cameraMode === 'simulation' ? 'bg-[#9dbeb7] border-[#9dbeb7] text-[#090b0e]' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}>
+                                        <button 
+                                            onClick={() => { stopBrowserWebcam(); toggleCameraMode('hardware', 1); }} 
+                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${!browserCamActive && cameraMode === 'hardware' && cameraIdx === 1 ? 'bg-[#e73213] border-[#e73213] text-white' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}
+                                        >
+                                            🔌 Server Cam 1 (USB)
+                                        </button>
+                                        <button 
+                                            onClick={() => { stopBrowserWebcam(); toggleCameraMode('simulation'); }} 
+                                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition shadow ${!browserCamActive && cameraMode === 'simulation' ? 'bg-[#9dbeb7] border-[#9dbeb7] text-[#090b0e]' : 'bg-[#0d0f12] border-glassBorder text-[#9dbeb7] hover:bg-zinc-800'}`}
+                                        >
                                             ⚙️ Simulation Mode
                                         </button>
                                     </div>

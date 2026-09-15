@@ -225,19 +225,32 @@ class VideoCamera:
             if not self.force_simulation:
                 with self.cap_lock:
                     if self.cap is None or not self.cap.isOpened():
-                        try:
-                            # Primary DirectShow backend for Windows
-                            self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-                            if self.cap.isOpened():
-                                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                                self.cap.set(cv2.CAP_PROP_FPS, 30)
-                            else:
-                                self.cap = cv2.VideoCapture(self.camera_index)
-                        except Exception as e:
-                            self.cap = None
+                        # Try requested camera index first
+                        indices_to_try = [self.camera_index]
+                        if self.camera_index != 0:
+                            indices_to_try.append(0)  # Fallback to index 0
 
-                    if self.cap and self.cap.isOpened():
+                        for test_idx in indices_to_try:
+                            try:
+                                cap_test = cv2.VideoCapture(test_idx, cv2.CAP_DSHOW)
+                                if cap_test.isOpened():
+                                    ret, test_frame = cap_test.read()
+                                    if ret and test_frame is not None and test_frame.size > 0:
+                                        self.cap = cap_test
+                                        self.camera_index = test_idx
+                                        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                                        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                                        self.cap.set(cv2.CAP_PROP_FPS, 30)
+                                        frame_captured = test_frame
+                                        break
+                                    else:
+                                        cap_test.release()
+                                else:
+                                    cap_test.release()
+                            except Exception:
+                                pass
+
+                    elif self.cap and self.cap.isOpened():
                         ret, frame = self.cap.read()
                         if ret and frame is not None and frame.size > 0:
                             frame_captured = frame

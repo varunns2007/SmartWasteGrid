@@ -160,6 +160,60 @@ def camera_mode():
         'is_hardware_active': cam.use_hardware_cam
     })
 
+@api_bp.route('/camera/classify_frame', methods=['POST'])
+def classify_frame():
+    import base64
+    import numpy as np
+    import cv2
+    from backend.camera_stream import VideoCamera
+
+    data = request.json or {}
+    image_b64 = data.get('image', '')
+    if not image_b64:
+        return jsonify({'status': 'ERROR', 'error': 'No image data provided'}), 400
+
+    try:
+        if ',' in image_b64:
+            image_b64 = image_b64.split(',', 1)[1]
+        img_bytes = base64.b64decode(image_b64)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return jsonify({'status': 'ERROR', 'error': 'Failed to decode image'}), 400
+
+        cam = VideoCamera()
+        if cam.model is None:
+            return jsonify({'status': 'ERROR', 'error': 'YOLO model not loaded'}), 500
+
+        results = cam.model.predict(source=frame, conf=0.45, verbose=False)
+        detections = []
+        if results and len(results) > 0:
+            boxes = results[0].boxes
+            if boxes is not None:
+                for box in boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                    cls_id = int(box.cls[0].cpu().numpy())
+                    conf = float(box.conf[0].cpu().numpy())
+                    cname = cam.class_names.get(cls_id, 'waste')
+                    decision = cam.sorting_bins.get(cls_id, 'GENERAL BIN')
+                    detections.append({
+                        'box': [x1, y1, x2, y2],
+                        'class_id': cls_id,
+                        'class_name': cname,
+                        'confidence': round(conf, 4),
+                        'sorting_decision': decision
+                    })
+                    if data.get('log_db', False) and conf >= 0.50:
+                        cam.log_detection_to_db(cls_id, cname, conf)
+
+        return jsonify({
+            'status': 'SUCCESS',
+            'detections': detections,
+            'count': len(detections)
+        })
+    except Exception as e:
+        return jsonify({'status': 'ERROR', 'error': str(e)}), 500
+
 @api_bp.route('/conveyor/simulate', methods=['POST'])
 def simulate_conveyor_detection():
     data = request.json or {}
