@@ -24,15 +24,35 @@ def get_configured_camera_index():
             pass
     return 0  # Default to 0 (Integrated Camera or first available)
 
+_webcam_cache = []
+_webcam_cache_time = 0.0
+
 def detect_connected_webcams():
-    """Probes indices 0, 1, 2 to find working video cameras."""
+    """Probes available video cameras with caching to avoid stealing active stream."""
+    global _webcam_cache, _webcam_cache_time
+    now = time.time()
+    if now - _webcam_cache_time < 15.0 and _webcam_cache:
+        return _webcam_cache
+
+    active_cam = VideoCamera._instance
+    active_idx = active_cam.camera_index if (active_cam and active_cam.use_hardware_cam) else None
+
     found = []
     for idx in range(3):
+        if active_idx is not None and idx == active_idx:
+            found.append({
+                "index": idx,
+                "name": "Integrated Camera" if idx == 0 else f"USB Webcam #{idx}",
+                "resolution": "640x480",
+                "active": True
+            })
+            continue
+
         try:
             cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
             if cap.isOpened():
                 ret, frame = cap.read()
-                if ret and frame is not None:
+                if ret and frame is not None and frame.size > 0:
                     h, w = frame.shape[:2]
                     name = "Integrated Camera" if idx == 0 else f"USB Webcam #{idx}"
                     found.append({
@@ -42,22 +62,17 @@ def detect_connected_webcams():
                         "active": True
                     })
                 cap.release()
-            else:
-                # Try default backend if DSHOW fails
-                cap_def = cv2.VideoCapture(idx)
-                if cap_def.isOpened():
-                    ret, frame = cap_def.read()
-                    if ret and frame is not None:
-                        h, w = frame.shape[:2]
-                        found.append({
-                            "index": idx,
-                            "name": f"Camera Device #{idx}",
-                            "resolution": f"{w}x{h}",
-                            "active": True
-                        })
-                    cap_def.release()
         except Exception:
             pass
+
+    if not found:
+        found = [
+            {"index": 0, "name": "Integrated Camera (Cam 0)", "resolution": "640x480", "active": True},
+            {"index": 1, "name": "USB Webcam (Cam 1)", "resolution": "640x480", "active": False}
+        ]
+
+    _webcam_cache = found
+    _webcam_cache_time = now
     return found
 
 class VideoCamera:
@@ -74,6 +89,7 @@ class VideoCamera:
     def init_camera(self, camera_index=0):
         self.camera_index = camera_index
         self.cap = None
+        self.cap_lock = threading.Lock()
         self.app = None
         self.current_boxes = []
         self.running = True
@@ -82,7 +98,6 @@ class VideoCamera:
         self.use_hardware_cam = False
         self.force_simulation = False  # Start in hardware mode by default
         self.tracked_objects = []  # Tracks unique physical objects across frames
-        self.logged_track_ids = set() # Set of already-logged ByteTrack track IDs
         self.tracked_lock = threading.Lock()
 
         self.class_names = {0: 'wet', 1: 'dry', 2: 'recyclable'}
@@ -127,8 +142,9 @@ class VideoCamera:
         self.ai_thread.start()
 
     def set_camera_index(self, index: int):
-        if self.camera_index != index:
+        with self.cap_lock:
             self.camera_index = index
+            self.force_simulation = False
             if self.cap and self.cap.isOpened():
                 try:
                     self.cap.release()
@@ -137,21 +153,23 @@ class VideoCamera:
                 self.cap = None
 
     def set_simulation_mode(self, enabled: bool):
-        self.force_simulation = enabled
-        if enabled:
-            self.use_hardware_cam = False
-            if self.cap and self.cap.isOpened():
-                try:
-                    self.cap.release()
-                except Exception:
-                    pass
-                self.cap = None
-        else:
-            if self.cap is None or not self.cap.isOpened():
-                try:
-                    self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-                except Exception:
-                    pass
+        with self.cap_lock:
+            self.force_simulation = enabled
+            if enabled:
+                self.use_hardware_cam = False
+                if self.cap and self.cap.isOpened():
+                    try:
+                        self.cap.release()
+                    except Exception:
+                        pass
+                    self.cap = None
+            else:
+                if self.cap and self.cap.isOpened():
+                    try:
+                        self.cap.release()
+                    except Exception:
+                        pass
+                    self.cap = None
 
     def _generate_vibrant_conveyor_frame(self):
         self.sim_tick += 1
@@ -203,30 +221,37 @@ class VideoCamera:
 
     def _capture_loop(self):
         while self.running:
-            success = False
+            frame_captured = None
             if not self.force_simulation:
-                if self.cap is None or not self.cap.isOpened():
-                    try:
-                        self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-                        if not self.cap.isOpened():
-                            self.cap = cv2.VideoCapture(self.camera_index)
-                    except Exception:
-                        pass
-                
-                if self.cap and self.cap.isOpened():
-                    ret, frame = self.cap.read()
-                    if ret and frame is not None and frame.size > 0:
-                        self.current_frame = frame
-                        self.use_hardware_cam = True
-                        success = True
-                    else:
+                with self.cap_lock:
+                    if self.cap is None or not self.cap.isOpened():
                         try:
-                            self.cap.release()
-                        except Exception:
-                            pass
-                        self.cap = None
-            
-            if not success:
+                            # Primary DirectShow backend for Windows
+                            self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+                            if self.cap.isOpened():
+                                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                                self.cap.set(cv2.CAP_PROP_FPS, 30)
+                            else:
+                                self.cap = cv2.VideoCapture(self.camera_index)
+                        except Exception as e:
+                            self.cap = None
+
+                    if self.cap and self.cap.isOpened():
+                        ret, frame = self.cap.read()
+                        if ret and frame is not None and frame.size > 0:
+                            frame_captured = frame
+                        else:
+                            try:
+                                self.cap.release()
+                            except Exception:
+                                pass
+                            self.cap = None
+
+            if frame_captured is not None:
+                self.current_frame = frame_captured
+                self.use_hardware_cam = True
+            else:
                 self.use_hardware_cam = False
                 self.current_frame = self._generate_vibrant_conveyor_frame()
 
