@@ -244,20 +244,30 @@
             const mapTileLayerRef = useRef(null);
 
             const startBrowserWebcam = async () => {
-                setBrowserCamActive(true);
                 try {
+                    // Release server hardware camera handle first so Windows frees device lock
+                    await fetch('/api/camera/mode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: 'simulation' })
+                    });
+                    
+                    // Small pause for Windows DirectShow driver to release device
+                    await new Promise(r => setTimeout(r, 250));
+
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
                         audio: false
                     });
                     browserStreamRef.current = stream;
+                    setBrowserCamActive(true);
                     if (browserVideoRef.current) {
                         browserVideoRef.current.srcObject = stream;
                         browserVideoRef.current.play();
                     }
                 } catch (err) {
                     console.error("Browser camera access error:", err);
-                    alert("Could not access browser webcam: " + err.message + "\nPlease allow camera permissions in your browser address bar.");
+                    alert("Browser Webcam Note: " + err.message + "\n\n1. If another application (like Zoom, Teams, or Windows Camera) is open, please close it.\n2. Click 'Server Cam 0 (Built-in)' to let the backend access it directly.");
                     setBrowserCamActive(false);
                 }
             };
