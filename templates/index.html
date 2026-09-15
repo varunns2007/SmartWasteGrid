@@ -253,12 +253,18 @@
                     });
                     
                     // Small pause for Windows DirectShow driver to release device
-                    await new Promise(r => setTimeout(r, 250));
+                    await new Promise(r => setTimeout(r, 200));
 
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-                        audio: false
-                    });
+                    let stream = null;
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: { width: { ideal: 640 }, height: { ideal: 480 } },
+                            audio: false
+                        });
+                    } catch (e) {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    }
+
                     browserStreamRef.current = stream;
                     setBrowserCamActive(true);
                     if (browserVideoRef.current) {
@@ -267,7 +273,7 @@
                     }
                 } catch (err) {
                     console.error("Browser camera access error:", err);
-                    alert("Browser Webcam Note: " + err.message + "\n\n1. If another application (like Zoom, Teams, or Windows Camera) is open, please close it.\n2. Click 'Server Cam 0 (Built-in)' to let the backend access it directly.");
+                    alert("Browser Webcam Notice:\n" + err.message + "\n\n1. Ensure browser has permission to access your webcam.\n2. If another app (Teams, Zoom, Camera app) is open, please close it.\n3. You can also click 'Server Cam 0 (Built-in)' to stream directly via the Python server.");
                     setBrowserCamActive(false);
                 }
             };
@@ -391,24 +397,29 @@
 
             useEffect(() => {
                 let intervalId = null;
+                let isClassifying = false;
+                const reusableCanvas = document.createElement('canvas');
+
                 if (browserCamActive && activeTab === 'transit') {
                     const classifyBrowserFrame = async () => {
+                        if (isClassifying) return; // Prevent request piling & UI lockup
                         const video = browserVideoRef.current;
                         const canvas = browserCanvasRef.current;
-                        if (!video || !canvas || video.readyState < 2) return;
+                        if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) return;
 
-                        canvas.width = video.videoWidth || 640;
-                        canvas.height = video.videoHeight || 480;
-                        const ctx = canvas.getContext('2d');
-
-                        const captureCanvas = document.createElement('canvas');
-                        captureCanvas.width = canvas.width;
-                        captureCanvas.height = canvas.height;
-                        const capCtx = captureCanvas.getContext('2d');
-                        capCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const b64Image = captureCanvas.toDataURL('image/jpeg', 0.85);
-
+                        isClassifying = true;
                         try {
+                            canvas.width = video.videoWidth || 640;
+                            canvas.height = video.videoHeight || 480;
+                            const ctx = canvas.getContext('2d');
+
+                            // Downscale snapshot for ultra-fast transfer & YOLO CPU inference
+                            reusableCanvas.width = 480;
+                            reusableCanvas.height = Math.round(480 * (canvas.height / canvas.width));
+                            const capCtx = reusableCanvas.getContext('2d');
+                            capCtx.drawImage(video, 0, 0, reusableCanvas.width, reusableCanvas.height);
+                            const b64Image = reusableCanvas.toDataURL('image/jpeg', 0.65);
+
                             const res = await fetch('/api/camera/classify_frame', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -417,9 +428,17 @@
 
                             ctx.clearRect(0, 0, canvas.width, canvas.height);
                             if (res && res.detections && res.detections.length > 0) {
+                                const scaleX = canvas.width / reusableCanvas.width;
+                                const scaleY = canvas.height / reusableCanvas.height;
+
                                 setBrowserCamDetections(res.detections);
                                 res.detections.forEach(det => {
-                                    const [x1, y1, x2, y2] = det.box;
+                                    const [rx1, ry1, rx2, ry2] = det.box;
+                                    const x1 = rx1 * scaleX;
+                                    const y1 = ry1 * scaleY;
+                                    const x2 = rx2 * scaleX;
+                                    const y2 = ry2 * scaleY;
+
                                     const colors = { 0: '#10b981', 1: '#f59e0b', 2: '#0ea5e9' };
                                     const color = colors[det.class_id] || '#a855f7';
 
@@ -439,10 +458,12 @@
                             }
                         } catch (err) {
                             console.error("Browser AI classification error:", err);
+                        } finally {
+                            isClassifying = false;
                         }
                     };
 
-                    intervalId = setInterval(classifyBrowserFrame, 220);
+                    intervalId = setInterval(classifyBrowserFrame, 250);
                 }
                 return () => {
                     if (intervalId) clearInterval(intervalId);

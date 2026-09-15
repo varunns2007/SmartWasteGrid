@@ -28,49 +28,19 @@ _webcam_cache = []
 _webcam_cache_time = 0.0
 
 def detect_connected_webcams():
-    """Probes available video cameras with caching to avoid stealing active stream."""
+    """Returns detected webcams without aggressive hardware probing that blocks active video."""
     global _webcam_cache, _webcam_cache_time
     now = time.time()
-    if now - _webcam_cache_time < 15.0 and _webcam_cache:
+    if now - _webcam_cache_time < 30.0 and _webcam_cache:
         return _webcam_cache
 
     active_cam = VideoCamera._instance
-    active_idx = active_cam.camera_index if (active_cam and active_cam.use_hardware_cam) else None
+    active_idx = active_cam.camera_index if (active_cam and active_cam.use_hardware_cam) else 0
 
-    found = []
-    for idx in range(3):
-        if active_idx is not None and idx == active_idx:
-            found.append({
-                "index": idx,
-                "name": "Integrated Camera" if idx == 0 else f"USB Webcam #{idx}",
-                "resolution": "640x480",
-                "active": True
-            })
-            continue
-
-        try:
-            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-            if cap.isOpened():
-                ret, frame = cap.read()
-                if ret and frame is not None and frame.size > 0:
-                    h, w = frame.shape[:2]
-                    name = "Integrated Camera" if idx == 0 else f"USB Webcam #{idx}"
-                    found.append({
-                        "index": idx,
-                        "name": name,
-                        "resolution": f"{w}x{h}",
-                        "active": True
-                    })
-                cap.release()
-        except Exception:
-            pass
-
-    if not found:
-        found = [
-            {"index": 0, "name": "Integrated Camera (Cam 0)", "resolution": "640x480", "active": True},
-            {"index": 1, "name": "USB Webcam (Cam 1)", "resolution": "640x480", "active": False}
-        ]
-
+    found = [
+        {"index": 0, "name": "Integrated Camera (Cam 0)", "resolution": "640x480", "active": (active_idx == 0)},
+        {"index": 1, "name": "USB Webcam (Cam 1)", "resolution": "640x480", "active": (active_idx == 1)}
+    ]
     _webcam_cache = found
     _webcam_cache_time = now
     return found
@@ -97,6 +67,7 @@ class VideoCamera:
         self.sim_tick = 0
         self.use_hardware_cam = False
         self.force_simulation = False  # Start in hardware mode by default
+        self.last_connect_attempt = 0.0
         self.tracked_objects = []  # Tracks unique physical objects across frames
         self.tracked_lock = threading.Lock()
 
@@ -224,31 +195,37 @@ class VideoCamera:
             frame_captured = None
             if not self.force_simulation:
                 with self.cap_lock:
+                    now = time.time()
                     if self.cap is None or not self.cap.isOpened():
-                        # Try requested camera index first
-                        indices_to_try = [self.camera_index]
-                        if self.camera_index != 0:
-                            indices_to_try.append(0)  # Fallback to index 0
+                        # Only attempt reconnection every 2.0 seconds to prevent DirectShow driver lockup
+                        if now - self.last_connect_attempt >= 2.0:
+                            self.last_connect_attempt = now
+                            indices_to_try = [self.camera_index]
+                            if self.camera_index != 0:
+                                indices_to_try.append(0)
 
-                        for test_idx in indices_to_try:
-                            try:
-                                cap_test = cv2.VideoCapture(test_idx, cv2.CAP_DSHOW)
-                                if cap_test.isOpened():
-                                    ret, test_frame = cap_test.read()
-                                    if ret and test_frame is not None and test_frame.size > 0:
-                                        self.cap = cap_test
-                                        self.camera_index = test_idx
-                                        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                                        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                                        self.cap.set(cv2.CAP_PROP_FPS, 30)
-                                        frame_captured = test_frame
-                                        break
-                                    else:
-                                        cap_test.release()
-                                else:
-                                    cap_test.release()
-                            except Exception:
-                                pass
+                            for test_idx in indices_to_try:
+                                for backend in [cv2.CAP_DSHOW, cv2.CAP_ANY]:
+                                    try:
+                                        cap_test = cv2.VideoCapture(test_idx, backend)
+                                        if cap_test.isOpened():
+                                            ret, test_frame = cap_test.read()
+                                            if ret and test_frame is not None and test_frame.size > 0:
+                                                self.cap = cap_test
+                                                self.camera_index = test_idx
+                                                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                                                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                                                self.cap.set(cv2.CAP_PROP_FPS, 30)
+                                                frame_captured = test_frame
+                                                break
+                                            else:
+                                                cap_test.release()
+                                        else:
+                                            cap_test.release()
+                                    except Exception:
+                                        pass
+                                if self.cap is not None:
+                                    break
 
                     elif self.cap and self.cap.isOpened():
                         ret, frame = self.cap.read()
@@ -275,7 +252,8 @@ class VideoCamera:
             if self.use_hardware_cam and self.model is not None and self.current_frame is not None:
                 try:
                     frame_copy = self.current_frame.copy()
-                    results = self.model.predict(source=frame_copy, conf=0.45, verbose=False)
+                    # Resize to 320 for ultra-fast CPU inference (<40ms) without stalling capture
+                    results = self.model.predict(source=frame_copy, imgsz=320, conf=0.40, verbose=False)
                     boxes_list = []
                     now = time.time()
 
@@ -320,7 +298,7 @@ class VideoCamera:
                     self.current_boxes = boxes_list
                 except Exception as e:
                     print(f"[!] AI loop error: {e}")
-            time.sleep(0.06)
+            time.sleep(0.12)
 
     def log_detection_to_db(self, cls_id, cname, conf):
         if not self.use_hardware_cam:

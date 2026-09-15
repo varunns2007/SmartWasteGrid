@@ -185,7 +185,7 @@ def classify_frame():
         if cam.model is None:
             return jsonify({'status': 'ERROR', 'error': 'YOLO model not loaded'}), 500
 
-        results = cam.model.predict(source=frame, conf=0.45, verbose=False)
+        results = cam.model.predict(source=frame, imgsz=320, conf=0.40, verbose=False)
         detections = []
         if results and len(results) > 0:
             boxes = results[0].boxes
